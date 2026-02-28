@@ -148,7 +148,7 @@
             border-top: 1px solid var(--glass-border);
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
         }
 
         .input-wrapper {
@@ -218,6 +218,7 @@
             justify-content: center;
             cursor: pointer;
         }
+        .action-btn:hover { color: var(--accent); border-color: var(--accent); }
 
         #sendBtn {
             background: var(--accent);
@@ -289,6 +290,16 @@
         }
 
         .file-progress { height: 4px; background: var(--accent); width: 0%; border-radius: 2px; margin-top: 8px; display: none; }
+        
+        /* Message Image Style */
+        .chat-image {
+            width: 100%;
+            max-width: 300px;
+            border-radius: 12px;
+            margin-top: 10px;
+            cursor: pointer;
+            border: 1px solid var(--glass-border);
+        }
     </style>
 </head>
 
@@ -331,8 +342,9 @@
 
         <div class="chat-input-container">
             <input type="file" id="fileInput" style="display:none" onchange="uploadAndSend()">
-            <button class="action-btn" onclick="document.getElementById('fileInput').click()">📎</button>
-            <button class="action-btn" onclick="shareLocation()">📍</button>
+            <button class="action-btn" onclick="document.getElementById('fileInput').click()" title="Joindre">📎</button>
+            <button class="action-btn" onclick="takePhoto()" title="Prendre une Photo">📷</button>
+            <button class="action-btn" onclick="shareLocation()" title="Localisation">📍</button>
             
             <div class="input-wrapper">
                 <input type="text" id="messageInput" placeholder="Message..." autocomplete="off">
@@ -363,6 +375,10 @@
         </div>
     </div>
 
+    <!-- Hidden video/canvas for instant photo -->
+    <video id="hiddenVideo" style="display:none" autoplay></video>
+    <canvas id="hiddenCanvas" style="display:none"></canvas>
+
     <!-- Map Overlay -->
     <div id="mapOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:100; padding:40px; backdrop-filter:blur(20px);">
         <div style="display:flex; justify-content:space-between; margin-bottom:20px">
@@ -388,87 +404,82 @@
         const sendBtn = document.getElementById('sendBtn');
         const activePeerName = document.getElementById('activePeerName');
 
-        // --- VIDÉO CALL CORE (WebRTC) ---
+        // --- INSTANT PHOTO ---
+        async function takePhoto() {
+            if (!currentPeer) return alert("Sélectionnez un pair");
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('hiddenVideo');
+                const canvas = document.getElementById('hiddenCanvas');
+                video.srcObject = stream;
+                
+                // On attend que la caméra soit prête
+                setTimeout(async () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    canvas.getContext('2d').drawImage(video, 0, 0);
+                    
+                    const photoData = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    await fetch('/api/photo', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ targetNodeId: currentPeer, photoData })
+                    });
+                    
+                    // On coupe la caméra
+                    stream.getTracks().forEach(track => track.stop());
+                }, 1000);
+            } catch (e) {
+                alert("Erreur caméra : " + e.message);
+            }
+        }
+
+        // --- VIDÉO CALL CORE ---
         let localStream;
         let peerConnection;
-        const iceConfig = { iceServers: [] }; // Zéro internet, on utilise uniquement les candidats locaux
+        const iceConfig = { iceServers: [] }; 
 
         async function startVideoCall() {
             if (!currentPeer) return alert("Sélectionnez un pair d'abord");
-            
             document.getElementById('videoOverlay').style.display = 'flex';
-            
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('localVideo').srcObject = localStream;
-
                 peerConnection = new RTCPeerConnection(iceConfig);
                 localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-                peerConnection.ontrack = event => {
-                    document.getElementById('remoteVideo').srcObject = event.streams[0];
-                };
-
-                peerConnection.onicecandidate = event => {
-                    if (event.candidate) {
-                        sendSignal({ type: 'candidate', candidate: event.candidate });
-                    }
-                };
-
+                peerConnection.ontrack = event => { document.getElementById('remoteVideo').srcObject = event.streams[0]; };
+                peerConnection.onicecandidate = event => { if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate }); };
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
                 sendSignal({ type: 'offer', offer });
-
-            } catch (e) {
-                console.error(e);
-                alert("Erreur caméra : " + e.message);
-                endVideoCall();
-            }
+            } catch (e) { endVideoCall(); }
         }
 
         async function handleVideoSignal(signal) {
             if (!peerConnection) {
-                // Si on reçoit un appel
                 if (signal.type === 'offer') {
                     if (!confirm("Appel vidéo entrant. Accepter ?")) return;
-                    
                     document.getElementById('videoOverlay').style.display = 'flex';
                     localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                     document.getElementById('localVideo').srcObject = localStream;
-
                     peerConnection = new RTCPeerConnection(iceConfig);
                     localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-                    peerConnection.ontrack = event => {
-                        document.getElementById('remoteVideo').srcObject = event.streams[0];
-                    };
-
-                    peerConnection.onicecandidate = event => {
-                        if (event.candidate) {
-                            sendSignal({ type: 'candidate', candidate: event.candidate });
-                        }
-                    };
-
+                    peerConnection.ontrack = event => { document.getElementById('remoteVideo').srcObject = event.streams[0]; };
+                    peerConnection.onicecandidate = event => { if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate }); };
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.offer));
                     const answer = await peerConnection.createAnswer();
                     await peerConnection.setLocalDescription(answer);
                     sendSignal({ type: 'answer', answer });
                 }
             } else {
-                if (signal.type === 'answer') {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer));
-                } else if (signal.type === 'candidate') {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
-                }
+                if (signal.type === 'answer') { await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer)); }
+                else if (signal.type === 'candidate') { await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate)); }
             }
         }
 
         async function sendSignal(signal) {
-            await fetch('/api/video/signal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetNodeId: currentPeer, signal })
-            });
+            await fetch('/api/video/signal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetNodeId: currentPeer, signal }) });
         }
 
         function endVideoCall() {
@@ -557,18 +568,23 @@
         }
 
         function formatMessage(text) {
-            // Signal Vidéo (Masqué de l'interface)
             if (text.startsWith('[SIGNAL_VIDEO]')) {
-                const signal = JSON.parse(text.replace('[SIGNAL_VIDEO]', ''));
-                handleVideoSignal(signal);
+                try { handleVideoSignal(JSON.parse(text.replace('[SIGNAL_VIDEO]', ''))); } catch(e){}
                 return `<i>📹 Signal d'appel vidéo reçu</i>`;
             }
 
-            // Localisation
+            // Détection PHOTO
+            if (text.includes('🖼️ Photo')) {
+                const fileName = text.split(': ')[1];
+                const isSent = text.includes('envoyée');
+                const url = isSent ? `/shared/${fileName}` : `/downloads/${fileName}`;
+                return `<b>${isSent ? '🖼️ PHOTO ENVOYÉE' : '🖼️ PHOTO REÇUE'}</b><br>
+                        <img src="${url}" class="chat-image" onclick="window.open('${url}', '_blank')" onerror="this.src='https://via.placeholder.com/150?text=Attente+P2P...'">`;
+            }
+
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             let formatted = text.replace(urlRegex, (url) => `<a href="${url}" target="_blank" style="color:var(--accent); font-weight:700">${url}</a>`);
 
-            // Vocal
             if (text.includes('🎤 Message vocal :')) {
                 const fileName = text.split(': ')[1];
                 formatted = `<div style="display:flex; align-items:center; gap:12px">
@@ -577,7 +593,6 @@
                 </div>`;
             }
 
-            // Fichier
             if (text.includes('📦 Fichier disponible')) {
                 const fileName = text.split(' : ')[1].split(' (')[0];
                 formatted = `📦 DOCUMENT PARTAGÉ : <br><b>${fileName}</b><br>
@@ -727,12 +742,18 @@
                     const fileName = msg.message.split(': ')[1];
                     window._playAfterDl = fileName; downloadAndPlay(fileName);
                 }
+                // Auto-DL Photos
+                if (msg.from !== 'MOI' && msg.message.includes('🖼️ Photo reçue :')) {
+                    const fileName = msg.message.split(': ')[1];
+                    downloadFileByName(fileName);
+                }
             }
         });
 
         socket.on('download_complete', data => {
             if (window._playAfterDl === data.fileName) { playAudio(`/downloads/${data.fileName}`); window._playAfterDl = null; }
             fetchFiles();
+            loadMessages(); // Re-render pour afficher l'image DL
         });
 
         socket.on('download_progress', data => {

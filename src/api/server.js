@@ -275,6 +275,35 @@ async function startArchipelEngine() {
         }
     });
 
+    app.post('/api/photo', async (req, res) => {
+        const { targetNodeId, photoData } = req.body;
+        if (!photoData || !targetNodeId) return res.status(400).json({ error: "Photo ou destinataire manquants" });
+
+        try {
+            const fileName = `PHOTO_${Date.now()}.jpg`;
+            const finalPath = path.join('shared', fileName);
+            
+            // On retire le prefixe base64 data:image/jpeg;base64,
+            const base64Data = photoData.replace(/^data:image\/jpeg;base64,/, "");
+            fs.writeFileSync(finalPath, base64Data, 'base64');
+            
+            indexSharedFiles();
+            const allFiles = listAllFiles();
+            const manifest = allFiles.find(f => f.file_name === fileName && f.location === 'local');
+
+            if (manifest) {
+                const { sendManifest } = await import('../transfer/transfer.js');
+                await sendManifest(tcpServer, targetNodeId, manifest.file_id);
+
+                await messenger.send(targetNodeId, `🖼️ Photo reçue : ${fileName}`);
+                io.emit('new_message', { from: 'MOI', to: targetNodeId, message: `🖼️ Photo envoyée : ${fileName}`, timestamp: Date.now() });
+            }
+            res.json({ success: true, fileName });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     console.log(`[UI] 🚀 ARCHIPEL Engine prêt.`);
 }
 
