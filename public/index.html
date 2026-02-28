@@ -561,18 +561,20 @@
         async function downloadAndPlay(fileName) {
             const res = await fetch('/api/files');
             const files = await res.json();
-            const file = files.find(f => f.file_name === fileName && f.location === 'remote');
+            
+            const localInShared = files.find(f => f.file_name === fileName && f.location === 'local');
+            if (localInShared) {
+                playAudio(`/shared/${fileName}`);
+                return;
+            }
 
-            if (file) {
-                // Notifie le système qu'on veut le jouer après le DL
+            const remote = files.find(f => f.file_name === fileName && f.location === 'remote');
+            if (remote) {
                 window._playAfterDl = fileName;
-                await downloadFile(file.file_id, file.fromNodeId);
+                await downloadFile(remote.file_id, remote.fromNodeId);
             } else {
-                // Si on a déjà le fichier localement (déjà DL)
-                const local = files.find(f => f.file_name === fileName && f.location === 'local');
-                if (local) {
-                    playAudio(`/shared/${fileName}`);
-                }
+                // Tentative dans /downloads au cas où
+                playAudio(`/downloads/${fileName}`);
             }
         }
 
@@ -647,7 +649,7 @@
             
             // Si c'était un vocal qu'on attendait de jouer
             if (window._playAfterDl) {
-                playAudio(`/shared/${window._playAfterDl}`);
+                playAudio(`/downloads/${window._playAfterDl}`);
                 window._playAfterDl = null;
             } else {
                 alert(`✅ Téléchargement terminé !\nFichier enregistré dans : ${data.path}`);

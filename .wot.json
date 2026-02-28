@@ -19,5 +19,12 @@
     "firstSeen": 1772265381648,
     "lastSeen": 1772265503243,
     "trusted": true
+  },
+  "7f9316d1242361ec36346b2939fe21886dc0a5442f2f281fa45f14521208ffd6": {
+    "signingPub": "302a300506032b6570032100789af32423f7ded06cf5989743a728913ce6e722b1649482f7fffb07b1e62595",
+    "dhPub": "302a300506032b656e0321008e6788b8f1bbf44fb3a68fececd9d9f5c3a3992ba3bbdb0d055e53c5bcc5c70d",
+    "firstSeen": 1772272477300,
+    "lastSeen": 1772273993107,
+    "trusted": true
   }
 }
