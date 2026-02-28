@@ -1,4 +1,86 @@
 {
   "shared": {},
-  "received": {}
+  "received": {
+    "c04231c2e941cb8169445420fe023fd05b4f4baee0a16b692e31bbd7f6f521f4": {
+      "file_id": "c04231c2e941cb8169445420fe023fd05b4f4baee0a16b692e31bbd7f6f521f4",
+      "file_name": "VOICE_1772259057601.webm",
+      "file_size": 110,
+      "chunk_size": 524288,
+      "chunk_count": 1,
+      "file_hash": "34625a59ca017ae414573bcb4a21464514f695d9806955fa676098939005795c",
+      "chunks": [
+        {
+          "index": 0,
+          "offset": 0,
+          "size": 110,
+          "hash": "34625a59ca017ae414573bcb4a21464514f695d9806955fa676098939005795c"
+        }
+      ],
+      "created_at": 1772259057628,
+      "path": "C:\\Users\\LBS PC\\Desktop\\ARCHIPEL\\ARCHIPEL\\shared\\VOICE_1772259057601.webm",
+      "fromNodeId": "b6a37ce29bc94ecb756e9053906c09c71a7fd96138986a252ae57a7fdf695260",
+      "receivedAt": 1772259094439,
+      "location": "remote"
+    },
+    "630f76ccc24a76bf03488d3bded38293ec55d506c0e85c8ffb210a8f4fe81dc6": {
+      "file_id": "630f76ccc24a76bf03488d3bded38293ec55d506c0e85c8ffb210a8f4fe81dc6",
+      "file_name": "VOICE_1772259067289.webm",
+      "file_size": 3194,
+      "chunk_size": 524288,
+      "chunk_count": 1,
+      "file_hash": "833f2105937819864fd2f5447005ad6f64f28e3da7077991a3509eb7228aa89f",
+      "chunks": [
+        {
+          "index": 0,
+          "offset": 0,
+          "size": 3194,
+          "hash": "833f2105937819864fd2f5447005ad6f64f28e3da7077991a3509eb7228aa89f"
+        }
+      ],
+      "created_at": 1772259067297,
+      "path": "C:\\Users\\LBS PC\\Desktop\\ARCHIPEL\\ARCHIPEL\\shared\\VOICE_1772259067289.webm",
+      "fromNodeId": "b6a37ce29bc94ecb756e9053906c09c71a7fd96138986a252ae57a7fdf695260",
+      "receivedAt": 1772259062477
+    },
+    "024326a09c522a079a4581249dd98d10f0f13733178363e4daf3d194798bf92c": {
+      "file_id": "024326a09c522a079a4581249dd98d10f0f13733178363e4daf3d194798bf92c",
+      "file_name": "VOICE_1772259069506.webm",
+      "file_size": 2228,
+      "chunk_size": 524288,
+      "chunk_count": 1,
+      "file_hash": "c1d1dbaa2e3b0bbaf4df224574d281005fddb6134ab5d5d1439dba4e2273ec39",
+      "chunks": [
+        {
+          "index": 0,
+          "offset": 0,
+          "size": 2228,
+          "hash": "c1d1dbaa2e3b0bbaf4df224574d281005fddb6134ab5d5d1439dba4e2273ec39"
+        }
+      ],
+      "created_at": 1772259069510,
+      "path": "C:\\Users\\LBS PC\\Desktop\\ARCHIPEL\\ARCHIPEL\\shared\\VOICE_1772259069506.webm",
+      "fromNodeId": "b6a37ce29bc94ecb756e9053906c09c71a7fd96138986a252ae57a7fdf695260",
+      "receivedAt": 1772259064688
+    },
+    "821b421d1f6c69dcc6753d78b34de0a211f4b8cc8d68dc848d9eb50f2d2fa2b9": {
+      "file_id": "821b421d1f6c69dcc6753d78b34de0a211f4b8cc8d68dc848d9eb50f2d2fa2b9",
+      "file_name": "VOICE_1772259071685.webm",
+      "file_size": 2228,
+      "chunk_size": 524288,
+      "chunk_count": 1,
+      "file_hash": "43fdd9f1c3d8c6d52ef4a54387d8814f9e1d30946c914ea3378387be83ec22b7",
+      "chunks": [
+        {
+          "index": 0,
+          "offset": 0,
+          "size": 2228,
+          "hash": "43fdd9f1c3d8c6d52ef4a54387d8814f9e1d30946c914ea3378387be83ec22b7"
+        }
+      ],
+      "created_at": 1772259071696,
+      "path": "C:\\Users\\LBS PC\\Desktop\\ARCHIPEL\\ARCHIPEL\\shared\\VOICE_1772259071685.webm",
+      "fromNodeId": "b6a37ce29bc94ecb756e9053906c09c71a7fd96138986a252ae57a7fdf695260",
+      "receivedAt": 1772259067045
+    }
+  }
 }

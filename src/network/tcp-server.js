@@ -90,6 +90,11 @@ export class TcpServer {
     /* ── Clé HMAC à utiliser selon l'émetteur ───────────────────────── */
     _getHmacKey(buf) {
         if (buf.length < 37) return PUBLIC_HMAC_KEY;
+        const type = buf[4];
+
+        // Les paquets HELLO et MANIFEST utilisent toujours la clé publique
+        if (type === PacketType.HELLO || type === PacketType.MANIFEST) return PUBLIC_HMAC_KEY;
+
         const senderId = buf.slice(5, 37).toString('hex');
         const peer = peerTable.get(senderId);
         return peer?.sessionKey || PUBLIC_HMAC_KEY;
