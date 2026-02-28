@@ -114,31 +114,31 @@ export class TcpServer {
 
             switch (packet.type) {
 
-                /* ── HELLO (Découverte via TCP) ────────────────────────────── */
+                /* ── HELLO (Découverte via TCP / Manuel IP) ───────────────── */
                 case PacketType.HELLO: {
                     const peerInfo = {
                         nodeId: data.nodeId,
                         ip: socket.remoteAddress?.replace('::ffff:', ''),
-                        tcpPort: data.tcpPort,
+                        tcpPort: data.tcpPort || 7777,
                         dhPublicKey: data.dhPublicKey,
                         signingPublicKey: data.signingPublicKey,
                         sharedFiles: data.sharedFiles || [],
                     };
-                    const isNew = !peerTable.get(data.nodeId);
+                    
+                    // On enregistre le pair IMMÉDIATEMENT (priorité Manuel IP)
                     peerTable.upsert(peerInfo);
                     this.connections.set(data.nodeId, socket);
+                    
+                    // On notifie l'UI tout de suite
                     this.onPeerDiscovered(peerInfo);
-                    console.log(`[TCP] ✨ Pair découvert via TCP: ${data.nodeId.slice(0, 12)}…`);
+                    console.log(`[TCP] ✨ Pair connecté via IP DIRECTE: ${data.nodeId.slice(0, 12)}…`);
 
-                    // Si c'est un nouveau pair qui nous contacte, on lui répond HELLO
-                    // pour qu'il nous connaisse aussi immédiatement
-                    if (isNew) {
-                        import('../transfer/file-index.js').then(({ getSharedFileSummaries }) => {
-                            const summaries = getSharedFileSummaries();
-                            const hello = buildHelloPacket(this.identity, this._port, summaries);
-                            socket.write(hello);
-                        });
-                    }
+                    // On répond par notre propre HELLO pour que la connexion soit réciproque
+                    import('../transfer/file-index.js').then(({ getSharedFileSummaries }) => {
+                        const summaries = getSharedFileSummaries();
+                        const hello = buildHelloPacket(this.identity, this._port, summaries);
+                        socket.write(hello);
+                    });
                     break;
                 }
 
@@ -343,10 +343,18 @@ export class TcpServer {
         return new Promise((resolve, reject) => {
             const socket = net.createConnection({ host: ip, port }, () => {
                 socket.setKeepAlive(true, KEEPALIVE_INTERVAL);
-                this.connections.set(nodeId, socket);
-                this._handleConnection(socket);
-                this._deliverRelayMessages(nodeId, socket);
-                resolve(socket);
+                
+                // Envoi immédiat du HELLO pour se présenter
+                import('../transfer/file-index.js').then(({ getSharedFileSummaries }) => {
+                    const summaries = getSharedFileSummaries();
+                    const hello = buildHelloPacket(this.identity, this._port, summaries);
+                    socket.write(hello);
+                    
+                    this.connections.set(nodeId, socket);
+                    this._handleConnection(socket);
+                    this._deliverRelayMessages(nodeId, socket);
+                    resolve(socket);
+                });
             });
             socket.on('error', reject);
             setTimeout(() => {
