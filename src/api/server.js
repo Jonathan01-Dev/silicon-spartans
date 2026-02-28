@@ -40,7 +40,12 @@ async function startArchipelEngine() {
 
     const identity = loadOrCreateIdentity();
 
+    let messenger; // Sera initialisé après tcpServer
+
     const tcpServer = new TcpServer(identity, (msgInfo) => {
+        // MISSION CRITIQUE : Donner le message au Messenger pour l'historique
+        if (messenger) messenger.receive(msgInfo);
+        
         // Envoi au frontend via Socket.io
         io.emit('new_message', msgInfo);
     }, (peer) => {
@@ -54,7 +59,7 @@ async function startArchipelEngine() {
     });
     await discovery.start();
 
-    const messenger = new Messenger(identity, tcpServer);
+    messenger = new Messenger(identity, tcpServer);
 
     // ─── Routes API ─────────────────────────────────────────────────────────────
 

@@ -125,20 +125,24 @@ export class TcpServer {
                         sharedFiles: data.sharedFiles || [],
                     };
                     
-                    // On enregistre le pair IMMÉDIATEMENT (priorité Manuel IP)
+                    const isNew = !peerTable.get(data.nodeId);
+                    
+                    // On enregistre le pair
                     peerTable.upsert(peerInfo);
                     this.connections.set(data.nodeId, socket);
                     
-                    // On notifie l'UI tout de suite
+                    // On notifie l'UI
                     this.onPeerDiscovered(peerInfo);
-                    console.log(`[TCP] ✨ Pair connecté via IP DIRECTE: ${data.nodeId.slice(0, 12)}…`);
 
-                    // On répond par notre propre HELLO pour que la connexion soit réciproque
-                    import('../transfer/file-index.js').then(({ getSharedFileSummaries }) => {
-                        const summaries = getSharedFileSummaries();
-                        const hello = buildHelloPacket(this.identity, this._port, summaries);
-                        socket.write(hello);
-                    });
+                    // ON NE RÉPOND QUE SI C'EST UN NOUVEAU PAIR (pour briser la boucle)
+                    if (isNew) {
+                        console.log(`[TCP] ✨ Nouveau pair connecté via IP DIRECTE: ${data.nodeId.slice(0, 12)}…`);
+                        import('../transfer/file-index.js').then(({ getSharedFileSummaries }) => {
+                            const summaries = getSharedFileSummaries();
+                            const hello = buildHelloPacket(this.identity, this._port, summaries);
+                            socket.write(hello);
+                        });
+                    }
                     break;
                 }
 
