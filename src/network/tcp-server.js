@@ -101,9 +101,14 @@ export class TcpServer {
         return PUBLIC_HMAC_KEY;
     }
 
-    /* ── Dispatch des paquets reçus ─────────────────────────────────── */
+    /* ── Dispatch des paquets reçus ────────────────────────────────── */
     async _handlePacket(packet, socket) {
         try {
+            // On enregistre systématiquement la connexion pour ce nodeId
+            if (packet.nodeId) {
+                this.connections.set(packet.nodeId, socket);
+            }
+
             const data = parseJsonPayload(packet);
             if (!data && packet.type !== PacketType.ACK) return;
 
@@ -296,11 +301,14 @@ export class TcpServer {
 
     /* ── Envoi TCP vers un pair ─────────────────────────────────────── */
     async sendTo(nodeId, packetBuf) {
-        const peer = peerTable.get(nodeId);
-        if (!peer) throw new Error(`Pair inconnu: ${nodeId}`);
-
         let socket = this.connections.get(nodeId);
+
         if (!socket || socket.destroyed) {
+            const peer = peerTable.get(nodeId);
+            if (!peer) {
+                console.warn(`[TCP] ⚠️ Pair ${nodeId.slice(0, 12)}… inconnu dans peerTable. On attend le HELLO ?`);
+                throw new Error(`Pair inconnu: ${nodeId}`);
+            }
             socket = await this._connect(peer.ip, peer.tcpPort, nodeId);
         }
 
