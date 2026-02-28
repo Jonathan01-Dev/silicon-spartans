@@ -81,6 +81,46 @@
       "path": "C:\\Users\\LBS PC\\Desktop\\ARCHIPEL\\ARCHIPEL\\shared\\VOICE_1772259071685.webm",
       "fromNodeId": "b6a37ce29bc94ecb756e9053906c09c71a7fd96138986a252ae57a7fdf695260",
       "receivedAt": 1772259067045
+    },
+    "93a283afe1e35ff0817c40b4debd8be5c82371c7bfae9098c13b2f966c7b42c4": {
+      "file_id": "93a283afe1e35ff0817c40b4debd8be5c82371c7bfae9098c13b2f966c7b42c4",
+      "file_name": "ed25519.key",
+      "file_size": 32,
+      "chunk_size": 524288,
+      "chunk_count": 1,
+      "file_hash": "836849c1a604074769ccfae3ee6d7a2daf22ac399d186942803289a11d72c89b",
+      "chunks": [
+        {
+          "index": 0,
+          "offset": 0,
+          "size": 32,
+          "hash": "836849c1a604074769ccfae3ee6d7a2daf22ac399d186942803289a11d72c89b"
+        }
+      ],
+      "created_at": 1772265404861,
+      "path": "C:\\Users\\LBS PC\\Desktop\\ARCHIPEL\\ARCHIPEL\\shared\\ed25519.key",
+      "fromNodeId": "b6a37ce29bc94ecb756e9053906c09c71a7fd96138986a252ae57a7fdf695260",
+      "receivedAt": 1772265399901
+    },
+    "1737eda9fd826a6ad5d3ac897d6059a055b9fdb25c12c9a7bf01826de2927a68": {
+      "file_id": "1737eda9fd826a6ad5d3ac897d6059a055b9fdb25c12c9a7bf01826de2927a68",
+      "file_name": "VOICE_1772265537109.webm",
+      "file_size": 2228,
+      "chunk_size": 524288,
+      "chunk_count": 1,
+      "file_hash": "55725d2f2227dad7398a13d9e61ef6c707f31b39151c8c2ebce44a6d78028269",
+      "chunks": [
+        {
+          "index": 0,
+          "offset": 0,
+          "size": 2228,
+          "hash": "55725d2f2227dad7398a13d9e61ef6c707f31b39151c8c2ebce44a6d78028269"
+        }
+      ],
+      "created_at": 1772265537114,
+      "path": "C:\\Users\\LBS PC\\Desktop\\ARCHIPEL\\ARCHIPEL\\shared\\VOICE_1772265537109.webm",
+      "fromNodeId": "b6a37ce29bc94ecb756e9053906c09c71a7fd96138986a252ae57a7fdf695260",
+      "receivedAt": 1772265532099
     }
   }
 }

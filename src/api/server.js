@@ -27,6 +27,8 @@ const WEB_PORT = 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../../public')));
+app.use('/shared', express.static(path.join(__dirname, '../../shared')));
+app.use('/downloads', express.static(path.join(__dirname, '../../downloads')));
 
 // ─── Initialisation du Moteur ARCHIPEL ─────────────────────────────────────────
 
@@ -187,8 +189,8 @@ async function startArchipelEngine() {
                 const { sendManifest } = await import('../transfer/transfer.js');
                 await sendManifest(tcpServer, targetNodeId, manifest.file_id);
 
-                // On envoie aussi un petit message texte pour prévenir
-                await messenger.send(targetNodeId, `🎤 Message vocal émis (${fileName})`);
+                // On envoie aussi un petit message texte pour prévenir (format détecté par l'UI)
+                await messenger.send(targetNodeId, `🎤 Message vocal : ${fileName}`);
                 io.emit('new_message', { from: 'MOI', to: targetNodeId, message: `🎤 Message vocal : ${fileName}`, timestamp: Date.now() });
             }
 

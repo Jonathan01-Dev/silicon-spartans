@@ -8,6 +8,15 @@ import path from 'path';
 import { buildPacket, PacketType, PUBLIC_HMAC_KEY } from '../crypto/packet.js';
 import { readChunk, assembleFile, verifyChunk } from './chunker.js';
 import { getLocalManifest, saveRemoteManifest, DL_DIR } from './file-index.js';
+import { peerTable } from '../network/peer-table.js';
+
+/**
+ * Récupère la meilleure clé HMAC pour communiquer avec un pair
+ */
+function getHmacKeyFor(nodeId) {
+    const peer = peerTable.get(nodeId);
+    return peer?.sessionKey || PUBLIC_HMAC_KEY;
+}
 
 /**
  * ÉMETTEUR — Envoie le manifest d'un fichier à un pair
@@ -17,7 +26,8 @@ export async function sendManifest(tcpServer, nodeId, fileId, hmacKey = PUBLIC_H
     if (!manifest) throw new Error(`Fichier inconnu: ${fileId}`);
 
     const payload = JSON.stringify({ type: 'MANIFEST', manifest });
-    const packet = buildPacket(PacketType.MANIFEST, nodeId, payload, hmacKey);
+    const key = hmacKey === PUBLIC_HMAC_KEY ? getHmacKeyFor(nodeId) : hmacKey;
+    const packet = buildPacket(PacketType.MANIFEST, tcpServer.identity.nodeId, payload, key);
     await tcpServer.sendTo(nodeId, packet);
     console.log(`[TRANSFER] 📤 Manifest envoyé: ${manifest.file_name}`);
 }
@@ -25,7 +35,7 @@ export async function sendManifest(tcpServer, nodeId, fileId, hmacKey = PUBLIC_H
 /**
  * ÉMETTEUR — Envoie un chunk spécifique à un pair
  */
-export async function sendChunk(tcpServer, nodeId, fileId, chunkIndex, localIdentityNodeId, hmacKey = PUBLIC_HMAC_KEY) {
+export async function sendChunk(tcpServer, nodeId, fileId, chunkIndex, localIdentityNodeId, hmacKey = null) {
     const manifest = getLocalManifest(fileId);
     if (!manifest) throw new Error(`Fichier inconnu: ${fileId}`);
 
@@ -42,20 +52,22 @@ export async function sendChunk(tcpServer, nodeId, fileId, chunkIndex, localIden
         data: data.toString('base64'),
     });
 
-    const packet = buildPacket(PacketType.CHUNK_DATA, localIdentityNodeId, payload, hmacKey);
+    const key = hmacKey || getHmacKeyFor(nodeId);
+    const packet = buildPacket(PacketType.CHUNK_DATA, localIdentityNodeId, payload, key);
     await tcpServer.sendTo(nodeId, packet);
 }
 
 /**
  * RÉCEPTEUR — Demande un chunk à un pair
  */
-export async function requestChunk(tcpServer, nodeId, fileId, chunkIndex, localIdentityNodeId, hmacKey = PUBLIC_HMAC_KEY) {
+export async function requestChunk(tcpServer, nodeId, fileId, chunkIndex, localIdentityNodeId, hmacKey = null) {
     const payload = JSON.stringify({
         type: 'CHUNK_REQ',
         file_id: fileId,
         chunk_index: chunkIndex,
     });
-    const packet = buildPacket(PacketType.CHUNK_REQ, localIdentityNodeId, payload, hmacKey);
+    const key = hmacKey || getHmacKeyFor(nodeId);
+    const packet = buildPacket(PacketType.CHUNK_REQ, localIdentityNodeId, payload, key);
     await tcpServer.sendTo(nodeId, packet);
 }
 
@@ -76,46 +88,42 @@ export async function downloadFile(tcpServer, fromNodeId, manifest, localNodeId,
 
     console.log(`[TRANSFER] 📥 Téléchargement: ${manifest.file_name} (${(manifest.file_size / 1024 / 1024).toFixed(2)} MB, ${manifest.chunk_count} chunks)`);
 
+    const chunkHandlers = tcpServer._chunkHandlers || {};
+    tcpServer._chunkHandlers = chunkHandlers;
+
     // Demande tous les chunks (pipeline)
     for (let i = 0; i < manifest.chunk_count; i++) {
         await requestChunk(tcpServer, fromNodeId, manifest.file_id, i, localNodeId);
     }
 
-    // Attend la réception de tous les chunks via un polling sur tcpServer
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
+            delete chunkHandlers[manifest.file_id];
             reject(new Error('Timeout transfert — certains chunks non reçus'));
-        }, 120_000); // 2 minutes max
+        }, 120_000);
 
-        // Le TcpServer appellera ce handler quand des CHUNK_DATA arrivent
-        const originalHandler = tcpServer.onChunkReceived;
-        tcpServer.onChunkReceived = (data) => {
-            if (data.file_id !== manifest.file_id) return;
-
+        chunkHandlers[manifest.file_id] = (data) => {
             const chunkBuf = Buffer.from(data.data, 'base64');
             const chunkInfo = manifest.chunks[data.chunk_index];
 
             if (!verifyChunk(chunkBuf, chunkInfo.hash)) {
-                console.warn(`[TRANSFER] ⚠️ Chunk ${data.chunk_index} corrompu — re-demande`);
                 requestChunk(tcpServer, fromNodeId, manifest.file_id, data.chunk_index, localNodeId);
                 return;
             }
 
+            if (chunkBuffers[data.chunk_index]) return; // Déjà reçu
+
             chunkBuffers[data.chunk_index] = chunkBuf;
             downloaded++;
             onProgress(downloaded, manifest.chunk_count);
-            console.log(`[TRANSFER] ✅ Chunk ${data.chunk_index + 1}/${manifest.chunk_count}`);
 
             if (downloaded === manifest.chunk_count) {
                 clearTimeout(timeout);
-                tcpServer.onChunkReceived = originalHandler;
+                delete chunkHandlers[manifest.file_id];
                 try {
                     const outPath = assembleFile(manifest, chunkBuffers, DL_DIR);
-                    console.log(`[TRANSFER] 🎉 Fichier complet: ${outPath}`);
                     resolve(outPath);
-                } catch (err) {
-                    reject(err);
-                }
+                } catch (err) { reject(err); }
             }
         };
     });

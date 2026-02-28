@@ -52,5 +52,15 @@ Ce document présente l'évolution du projet ARCHIPEL, étape par étape, selon 
 
 ---
 
+## 🌐 Sprint 5 : Interface Web, Multimedia & Finalisation
+*L'objectif était d'humaniser le protocole avec une interface moderne et des fonctionnalités riches.*
+
+- **Interface Web Moderne** : Utilisation d'Express et Socket.io pour une interface temps réel intuitive, accessible via navigateur (port 3000).
+- **Messages Vocaux P2P** : Enregistrement et transmission de messages audio `.webm` chiffrés de bout-en-bout, offrant une alternative rapide au texte.
+- **Topologie Réseau Intégrée** : Visualisation dynamique (Canvas) des pairs connectés directement dans le navigateur, sans serveur central.
+- **Durcissement "Zéro-Internet"** : Retrait de toutes les dépendances CDN externes. Toutes les bibliothèques sont servies localement pour garantir un fonctionnement total hors-ligne.
+
+---
+
 ### 📝 Conclusion Technique
-ARCHIPEL est passé d'un simple concept de paquet binaire (Sprint 0) à un **système de communication P2P complet, chiffré, persistant et capable de transférer des fichiers en réseau retardé** (Sprint 4).
+ARCHIPEL est passé d'un simple concept de paquet binaire (Sprint 0) à un **système de communication P2P complet, chiffré, persistant et capable de transférer des fichiers en réseau retardé** (Sprint 4), le tout couronné par une **expérience utilisateur moderne et multimédia** (Sprint 5). Pour la mission survie, ARCHIPEL est prêt.

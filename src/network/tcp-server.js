@@ -91,13 +91,14 @@ export class TcpServer {
     _getHmacKey(buf) {
         if (buf.length < 37) return PUBLIC_HMAC_KEY;
         const type = buf[4];
-
-        // Les paquets HELLO et MANIFEST utilisent toujours la clé publique
-        if (type === PacketType.HELLO || type === PacketType.MANIFEST) return PUBLIC_HMAC_KEY;
-
         const senderId = buf.slice(5, 37).toString('hex');
         const peer = peerTable.get(senderId);
-        return peer?.sessionKey || PUBLIC_HMAC_KEY;
+
+        // Si on a une clé de session avec ce pair, on l'utilise en priorité
+        if (peer?.sessionKey) return peer.sessionKey;
+
+        // Sinon, fallback sur la clé publique (obligatoire pour HELLO)
+        return PUBLIC_HMAC_KEY;
     }
 
     /* ── Dispatch des paquets reçus ─────────────────────────────────── */
@@ -231,11 +232,12 @@ export class TcpServer {
                     break;
                 }
 
-                case PacketType.CHUNK_DATA:
-                    this.onChunkReceived(data);
+                case PacketType.CHUNK_DATA: {
+                    if (this._chunkHandlers && this._chunkHandlers[data.file_id]) {
+                        this._chunkHandlers[data.file_id](data);
+                    }
                     break;
-
-                /* ── RELAY reçu : on transporte ou on reçoit ? ────────────── */
+                } /* ── RELAY reçu : on transporte ou on reçoit ? ────────────── */
                 case PacketType.RELAY: {
                     if (!data || !data.target) return;
 
@@ -303,21 +305,24 @@ export class TcpServer {
             const socket = net.createConnection({ host: ip, port }, () => {
                 socket.setKeepAlive(true, KEEPALIVE_INTERVAL);
 
-                // On lui envoie notre HELLO pour qu'il nous découvre
-                const hello = buildHelloPacket(this.identity, this._port, getLocalManifest());
-                socket.write(hello);
-
-                this._handleConnection(socket);
-                resolve(socket);
+                // Import local pour éviter les cycles
+                import('../transfer/file-index.js').then(({ getSharedFileSummaries }) => {
+                    const summaries = getSharedFileSummaries();
+                    const hello = buildHelloPacket(this.identity, this._port, summaries);
+                    socket.write(hello);
+                    this._handleConnection(socket);
+                    resolve(socket);
+                });
             });
             socket.on('error', (err) => {
                 console.error(`[TCP] ❌ Échec connexion vers ${ip}:${port}`);
                 reject(err);
             });
             setTimeout(() => {
+                if (!socket.connecting) return;
                 socket.destroy();
                 reject(new Error('Timeout connexion IP'));
-            }, 5000);
+            }, 10000);
         });
     }
 
