@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARCHIPEL — P2P Messenger</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --sidebar: #1e293b;
+            --accent: #38bdf8;
+            --text: #f1f5f9;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            background: var(--sidebar);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .peer-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .peer-item {
+            padding: 12px;
+            background: var(--glass);
+            border-radius: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .peer-item:hover {
+            border-color: var(--accent);
+            transform: translateX(5px);
+        }
+        
+        .peer-item.active {
+            background: rgba(56, 189, 248, 0.1);
+            border-color: var(--accent);
+        }
+
+        .peer-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .peer-status {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        /* Main Chat Area */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        }
+
+        .chat-header {
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            max-width: 70%;
+            padding: 12px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            line-height: 1.5;
+            position: relative;
+        }
+
+        .message.sent {
+            align-self: flex-end;
+            background: var(--accent);
+            color: #0c4a6e;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.received {
+            align-self: flex-start;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input {
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 25px;
+            padding: 12px 20px;
+            color: white;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            border-color: var(--accent);
+        }
+
+        button {
+            background: var(--accent);
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.1);
+        }
+
+        .badge-encrypted {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 5px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo">🏝️ ARCHIPEL</div>
+        <div class="peer-list" id="peerList">
+            <!-- Liste des pairs injectée ici -->
+            <div style="opacity:0.5; font-size:12px; text-align:center; margin-top:50px;">
+                Recherche de pairs sur le LAN...
+            </div>
+        </div>
+        <div style="font-size:11px; color:#64748b; margin-top:20px; border-top:1px solid var(--border); padding-top:10px;">
+            <div id="myNodeId">NODE_ID: ...</div>
+            <div>Statut: <span style="color:#4ade80">● Actif</span></div>
+        </div>
+    </div>
+    
+    <div class="main">
+        <div class="chat-header">
+            <div>
+                <span id="activePeerName" style="font-weight:600">Choisissez un pair</span>
+                <span id="encryptStatus"></span>
+            </div>
+            <div style="font-size:12px; color:var(--accent)">MODE P2P PROVOCABLE</div>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div style="margin:auto; text-align:center; opacity:0.3; width:60%">
+                <p>Bienvenue sur ARCHIPEL.</p>
+                <p style="font-size:12px">Sélectionnez un contact à gauche pour démarrer une session de chat chiffrée de bout-en-bout.</p>
+            </div>
+        </div>
+        
+        <div class="chat-input">
+            <input type="text" id="messageInput" placeholder="Tapez votre message ici..." autocomplete="off">
+            <button id="sendBtn">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+            </button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentPeer = null;
+        let myNodeId = "";
+
+        // UI Elements
+        const peerListEl = document.getElementById('peerList');
+        const chatMessagesEl = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const activePeerName = document.getElementById('activePeerName');
+
+        // Fetch Initial Data
+        async function fetchStatus() {
+            const res = await fetch('/api/status');
+            const data = await res.json();
+            myNodeId = data.nodeId;
+            document.getElementById('myNodeId').innerText = `ID: ${myNodeId.slice(0,16)}…`;
+        }
+
+        async function fetchPeers() {
+            const res = await fetch('/api/peers');
+            const peers = await res.json();
+            renderPeers(peers);
+        }
+
+        function renderPeers(peers) {
+            peerListEl.innerHTML = peers.map(p => `
+                <div class="peer-item ${currentPeer === p.nodeId ? 'active' : ''}" onclick="selectPeer('${p.nodeId}')">
+                    <div class="peer-name">${p.nodeId.slice(0, 16)}…</div>
+                    <div class="peer-status">IP: ${p.ip} | Files: ${p.sharedFiles.length}</div>
+                </div>
+            `).join('') || '<div style="text-align:center; opacity:0.3">En attente de pairs...</div>';
+        }
+
+        async function selectPeer(nodeId) {
+            currentPeer = nodeId;
+            activePeerName.innerText = `Chat avec ${nodeId.slice(0, 12)}…`;
+            fetchPeers(); // Refresh active state
+            loadMessages();
+        }
+
+        async function loadMessages() {
+            const res = await fetch('/api/messages');
+            const messages = await res.json();
+            
+            chatMessagesEl.innerHTML = messages
+                .filter(m => m.from === currentPeer || m.to === currentPeer)
+                .map(m => `
+                    <div class="message ${m.from === 'MOI' ? 'sent' : 'received'}">
+                        ${m.message}
+                        <div style="font-size:9px; opacity:0.5; margin-top:5px; text-align:right">
+                            ${new Date(m.timestamp).toLocaleTimeString()}
+                        </div>
+                    </div>
+                `).join('');
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || !currentPeer) return;
+            
+            messageInput.value = '';
+            
+            // Optimistic Update
+            renderMessage({ from: 'MOI', message: text, timestamp: Date.now() });
+
+            await fetch('/api/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nodeId: currentPeer, message: text })
+            });
+        }
+
+        function renderMessage(m) {
+            const el = document.createElement('div');
+            el.className = `message ${m.from === 'MOI' ? 'sent' : 'received'}`;
+            el.innerHTML = `
+                ${m.message}
+                <div style="font-size:9px; opacity:0.5; margin-top:5px; text-align:right">
+                    ${new Date(m.timestamp).toLocaleTimeString()}
+                </div>
+            `;
+            chatMessagesEl.appendChild(el);
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+        }
+
+        // Socket Events
+        socket.on('new_message', (msg) => {
+            if (msg.from === currentPeer || msg.from === myNodeId) {
+                loadMessages();
+            }
+        });
+
+        socket.on('new_peer', () => fetchPeers());
+
+        // Event Listeners
+        sendBtn.onclick = sendMessage;
+        messageInput.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+
+        // Init
+        fetchStatus();
+        fetchPeers();
+        setInterval(fetchPeers, 10000); // Polling backup
+    </script>
+</body>
+</html>
