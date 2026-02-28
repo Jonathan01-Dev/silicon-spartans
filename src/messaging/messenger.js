@@ -113,8 +113,28 @@ export class Messenger {
     }
 
     /* ── Message reçu ────────────────────────────────────────────────── */
-    receive(msgInfo) {
+    async receive(msgInfo) {
         this._addToHistory({ from: msgInfo.from, to: 'MOI', message: msgInfo.message, encrypted: msgInfo.encrypted });
+
+        // 🧠 MISSION ORACLE : Partage d'IA P2P
+        // Si je reçois une demande IA et que J'AI la connexion (Clé API présente), je deviens le cerveau du réseau.
+        if (msgInfo.message.includes('@archipel-ai') && process.env.GEMINI_API_KEY && msgInfo.from !== 'MOI') {
+            console.log(`[IA] ⚡ Je traite une demande IA pour le pair ${msgInfo.from.slice(0, 12)}...`);
+            
+            try {
+                // Import dynamique pour éviter les cycles
+                const { GeminiAssistant } = await import('./gemini.js');
+                const gemini = new GeminiAssistant(process.env.GEMINI_API_KEY);
+                
+                const question = msgInfo.message.replace(/@archipel-ai/gi, '').trim();
+                const answer = await gemini.ask(question);
+
+                // Je renvoie la réponse via P2P
+                await this.send(msgInfo.from, `🤖 [IA ORACLE] ${answer}`);
+            } catch (err) {
+                console.error('[IA] Erreur traitement Oracle:', err);
+            }
+        }
     }
 
     /* ── Historique ─────────────────────────────────────────────────── */
