@@ -307,6 +307,30 @@ async function main() {
                 printHelp();
             }
 
+            // ── connect <ip> [port] ──────────────────────────────────────────────
+            else if (cmd === 'connect') {
+                if (parts.length < 2) {
+                    console.log(chalk.yellow('Usage: connect <ip> [port]'));
+                } else {
+                    const ip = parts[1];
+                    const port = parseInt(parts[2]) || 7777;
+                    console.log(chalk.cyan(`🔗 Tentative de connexion vers ${ip}:${port}...`));
+                    try {
+                        await tcpServer.sendToIP(ip, port);
+                        console.log(chalk.green(`✓ Signal envoyé. Attendez l'apparition du pair...`));
+                        // Force un rafraîchissement visuel après un court délai
+                        setTimeout(() => {
+                            const peers = peerTable.getActivePeers();
+                            if (peers.some(p => p.ip === ip)) {
+                                console.log(chalk.green(`\n✨ Connexion réussie avec ${ip} !`));
+                            }
+                        }, 2000);
+                    } catch (e) {
+                        console.log(chalk.red(`❌ Échec: ${e.message}`));
+                    }
+                }
+            }
+
             // ── exit ─────────────────────────────────────────────────────────────
             else if (cmd === 'exit' || cmd === 'quit') {
                 console.log(chalk.yellow('\n👋 Arrêt du nœud ARCHIPEL…'));
