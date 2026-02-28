@@ -58,6 +58,34 @@ npm run start-cli
 
 ---
 
+## 🗺️ Schéma de l'Architecture (Visualisation)
+
+```text
+       .¸¸.                   .¸¸.                   .¸¸.
+      | PC | <== TCP (E2EE) ==> | PC | <== TCP (E2EE) ==> | PC |
+      '¨¨'                   '¨¨'                   '¨¨'
+        ^                      ^                      ^
+        |                      |                      |
+        v                      v                      v
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ~            🌊  UDP MULTICAST DISCOVERY (Port 6000)     ~
+  ~       (Ondes Wi-Fi : "Allô ? Qui est sur l'archipel ?")  ~
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        ^                      ^                      ^
+        |                      |                      |
+        v                      v                      v
+       .¸¸.                   .¸¸.                   .¸¸.
+      | PC | <== TCP (E2EE) ==> | PC | <== TCP (E2EE) ==> | PC |
+      '¨¨'                   '¨¨'                   '¨¨'
+
+  [ LÉGENDE ]
+  <====> : Tunnel Direct Chiffré (Chat, Vidéo, Fichiers)
+  ~~~~~~ : Zone de Découverte (Sans IP manuelle)
+  .¸¸.   : Nœud Souverain (Client + Serveur + IA)
+```
+
+---
+
 **Propulsé par l'innovation et la résilience.**  
 
 ### 👥 Équipe ARCHIPEL — LBS Hackathon 2026
