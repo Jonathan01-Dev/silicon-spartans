@@ -258,7 +258,10 @@
                 <span id="activePeerName" style="font-weight:600">Choisissez un pair</span>
                 <span id="encryptStatus"></span>
             </div>
-            <div style="font-size:12px; color:var(--accent)">MODE P2P PROVOCABLE</div>
+            <div style="display:flex; gap:10px; align-items:center">
+                <button onclick="toggleMap()" title="Voir la topologie du réseau" style="background:var(--glass); border:1px solid var(--border); width:auto; height:auto; padding:5px 15px; border-radius:8px; font-size:11px; color:var(--accent)">🕸️ TOPOLOGIE</button>
+                <div style="font-size:12px; color:var(--accent)">MODE P2P PROVOCABLE</div>
+            </div>
         </div>
 
         <div class="chat-messages" id="chatMessages">
@@ -506,13 +509,13 @@
             // Détection de liens (Location, etc.)
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             let formatted = text.replace(urlRegex, (url) => {
-                if (url.includes('.webm') || url.includes('.mp3')) {
+                if (url.includes('.webm') || url.includes('.mp3') || url.includes('.wav')) {
                     return `<div style="margin-top:10px"><audio controls src="${url}" style="width:100%; height:30px"></audio></div>`;
                 }
                 return `<a href="${url}" target="_blank" style="color:var(--accent); text-decoration:underline">${url}</a>`;
             });
 
-            // Détection spécifique pour les vocaux internes (Mission : WhatsApp)
+            // Détection spécifique pour les vocaux internes
             if (text.includes('🎤 Message vocal :')) {
                 const fileName = text.split(': ')[1];
                 formatted = `🎤 Message vocal : <br><br>
@@ -521,7 +524,38 @@
                     </div>`;
             }
 
+            // Détection des fichiers partagés (P2P)
+            if (text.includes('📦 Fichier disponible :') || text.includes('📦 Fichier disponnible :')) {
+                const fileName = text.split(' : ')[1].split(' (')[0];
+                const isAudio = /\.(mp3|wav|ogg|webm)$/i.test(fileName);
+                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
+                
+                let icon = '📄';
+                if (isAudio) icon = '🎵';
+                if (isImage) icon = '🖼️';
+
+                formatted = `${icon} Fichier partagé : <b>${fileName}</b><br>
+                    <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; margin-top:10px">
+                        <button onclick="downloadFileByName('${fileName}')" style="width:auto; height:auto; padding:5px 15px; border-radius:5px; font-size:11px">📥 TÉLÉCHARGER</button>
+                        ${isAudio ? `<button onclick="downloadAndPlay('${fileName}')" style="width:auto; height:auto; padding:5px 15px; border-radius:5px; font-size:11px; margin-left:5px">▶ LIRE</button>` : ''}
+                    </div>`;
+            }
+
             return formatted;
+        }
+
+        async function downloadFileByName(fileName) {
+            const res = await fetch('/api/files');
+            const files = await res.json();
+            const file = files.find(f => f.file_name === fileName && f.location === 'remote');
+
+            if (file) {
+                await downloadFile(file.file_id, file.fromNodeId);
+            } else {
+                const local = files.find(f => f.file_name === fileName && f.location === 'local');
+                if (local) alert("Ce fichier est déjà sur votre machine (dossier shared/)");
+                else alert("Fichier introuvable. Attendez que l'indexation se termine.");
+            }
         }
 
         async function downloadAndPlay(fileName) {
@@ -610,7 +644,14 @@
         socket.on('download_complete', (data) => {
             const progress = document.getElementById(`progress-${data.fileId}`);
             if (progress) progress.style.background = '#4ade80';
-            alert(`✅ Téléchargement terminé !\nFichier enregistré dans : ${data.path}`);
+            
+            // Si c'était un vocal qu'on attendait de jouer
+            if (window._playAfterDl) {
+                playAudio(`/shared/${window._playAfterDl}`);
+                window._playAfterDl = null;
+            } else {
+                alert(`✅ Téléchargement terminé !\nFichier enregistré dans : ${data.path}`);
+            }
             fetchFiles();
         });
 
@@ -623,6 +664,7 @@
         fetchPeers();
         fetchFiles();
         setInterval(() => { fetchPeers(); fetchFiles(); }, 5000);
+        
         // Voice Recording Logic
         let mediaRecorder;
         let audioChunks = [];
@@ -633,28 +675,33 @@
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = async () => {
+                        const base64data = reader.result.split(',')[1];
+                        await fetch('/api/voice', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ targetNodeId: currentPeer, audioData: base64data })
+                        });
+                    }
+                };
+
                 mediaRecorder.start();
                 document.getElementById('voiceBtn').classList.add('recording');
-            } catch (e) { alert("Micro non autorisé"); }
+            } catch (e) { 
+                console.error(e);
+                alert("Micro non autorisé ou erreur"); 
+            }
         }
 
         async function stopRecording() {
-            if (!mediaRecorder) return;
+            if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
             mediaRecorder.stop();
             document.getElementById('voiceBtn').classList.remove('recording');
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                const reader = new FileReader();
-                reader.readAsDataURL(audioBlob);
-                reader.onloadend = async () => {
-                    const base64data = reader.result.split(',')[1];
-                    await fetch('/api/voice', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ targetNodeId: currentPeer, audioData: base64data })
-                    });
-                }
-            };
         }
 
         // Network Map Logic

@@ -119,10 +119,21 @@ export class TcpServer {
                         signingPublicKey: data.signingPublicKey,
                         sharedFiles: data.sharedFiles || [],
                     };
+                    const isNew = !peerTable.get(data.nodeId);
                     peerTable.upsert(peerInfo);
                     this.connections.set(data.nodeId, socket);
                     this.onPeerDiscovered(peerInfo);
                     console.log(`[TCP] ✨ Pair découvert via TCP: ${data.nodeId.slice(0, 12)}…`);
+
+                    // Si c'est un nouveau pair qui nous contacte, on lui répond HELLO
+                    // pour qu'il nous connaisse aussi immédiatement
+                    if (isNew) {
+                        import('../transfer/file-index.js').then(({ getSharedFileSummaries }) => {
+                            const summaries = getSharedFileSummaries();
+                            const hello = buildHelloPacket(this.identity, this._port, summaries);
+                            socket.write(hello);
+                        });
+                    }
                     break;
                 }
 
