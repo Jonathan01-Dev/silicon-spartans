@@ -13,15 +13,17 @@ export class Messenger {
     constructor(identity, tcpServer) {
         this.identity = identity;
         this.tcpServer = tcpServer;
-        /** @type {Array} */
-        this.history = getDbHistory().map(m => ({
+
+        // Charger l'historique initial
+        const rawHistory = getDbHistory() || [];
+        this.history = rawHistory.map(m => ({
             from: m.sender,
             to: m.sender === 'MOI' ? m.peer_id : 'MOI',
             message: m.content,
             encrypted: !!m.encrypted,
             timestamp: m.timestamp
         }));
-        /** Handshakes en attente { nodeId -> { ephemeralPriv, ephemeralPub } } */
+
         this._pendingHandshakes = new Map();
     }
 

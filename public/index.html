@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ARCHIPEL — P2P Messenger</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Zéro dépendance externe pour conformité Hackathon -->
     <style>
         :root {
             --bg: #0f172a;
@@ -14,11 +15,14 @@
             --glass: rgba(255, 255, 255, 0.05);
             --border: rgba(255, 255, 255, 0.1);
         }
-        
-        * { box-sizing: border-box; }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             margin: 0;
-            font-family: 'Outfit', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             display: flex;
@@ -35,7 +39,7 @@
             flex-direction: column;
             padding: 20px;
         }
-        
+
         .logo {
             font-size: 24px;
             font-weight: 600;
@@ -65,7 +69,7 @@
             border-color: var(--accent);
             transform: translateX(5px);
         }
-        
+
         .peer-item.active {
             background: rgba(56, 189, 248, 0.1);
             border-color: var(--accent);
@@ -75,7 +79,7 @@
             font-weight: 600;
             font-size: 14px;
         }
-        
+
         .peer-status {
             font-size: 11px;
             color: #94a3b8;
@@ -182,27 +186,40 @@
         }
 
         /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
 
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
     </style>
 </head>
+
 <body>
     <div class="sidebar">
         <div class="logo">🏝️ ARCHIPEL</div>
         <div class="peer-list" id="peerList">
             <!-- Liste des pairs injectée ici -->
-            <div style="opacity:0.5; font-size:12px; text-align:center; margin-top:50px;">
-                Recherche de pairs sur le LAN...
-            </div>
         </div>
-        <div style="font-size:11px; color:#64748b; margin-top:20px; border-top:1px solid var(--border); padding-top:10px;">
+
+        <div style="margin-top:20px; font-weight:600; font-size:12px; color:var(--accent); margin-bottom:10px;">📦
+            FICHIERS P2P</div>
+        <div class="peer-list" id="fileList">
+            <!-- Liste des fichiers injectée ici -->
+        </div>
+        <div
+            style="font-size:11px; color:#64748b; margin-top:20px; border-top:1px solid var(--border); padding-top:10px;">
             <div id="myNodeId">NODE_ID: ...</div>
             <div>Statut: <span style="color:#4ade80">● Actif</span></div>
         </div>
     </div>
-    
+
     <div class="main">
         <div class="chat-header">
             <div>
@@ -211,18 +228,21 @@
             </div>
             <div style="font-size:12px; color:var(--accent)">MODE P2P PROVOCABLE</div>
         </div>
-        
+
         <div class="chat-messages" id="chatMessages">
             <div style="margin:auto; text-align:center; opacity:0.3; width:60%">
                 <p>Bienvenue sur ARCHIPEL.</p>
-                <p style="font-size:12px">Sélectionnez un contact à gauche pour démarrer une session de chat chiffrée de bout-en-bout.</p>
+                <p style="font-size:12px">Sélectionnez un contact à gauche pour démarrer une session de chat chiffrée de
+                    bout-en-bout.</p>
             </div>
         </div>
-        
+
         <div class="chat-input">
             <input type="text" id="messageInput" placeholder="Tapez votre message ici..." autocomplete="off">
             <button id="sendBtn">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path></svg>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"></path>
+                </svg>
             </button>
         </div>
     </div>
@@ -245,7 +265,7 @@
             const res = await fetch('/api/status');
             const data = await res.json();
             myNodeId = data.nodeId;
-            document.getElementById('myNodeId').innerText = `ID: ${myNodeId.slice(0,16)}…`;
+            document.getElementById('myNodeId').innerText = `ID: ${myNodeId.slice(0, 16)}…`;
         }
 
         async function fetchPeers() {
@@ -254,13 +274,50 @@
             renderPeers(peers);
         }
 
+        async function fetchFiles() {
+            const res = await fetch('/api/files');
+            const files = await res.json();
+            renderFiles(files);
+        }
+
         function renderPeers(peers) {
+            if (peers.length === 0) {
+                peerListEl.innerHTML = '<div style="opacity:0.3; font-size:11px; text-align:center">Aucun pair...</div>';
+                return;
+            }
             peerListEl.innerHTML = peers.map(p => `
                 <div class="peer-item ${currentPeer === p.nodeId ? 'active' : ''}" onclick="selectPeer('${p.nodeId}')">
                     <div class="peer-name">${p.nodeId.slice(0, 16)}…</div>
-                    <div class="peer-status">IP: ${p.ip} | Files: ${p.sharedFiles.length}</div>
+                    <div class="peer-status">IP: ${p.ip} | TCP: ${p.tcpPort}</div>
                 </div>
-            `).join('') || '<div style="text-align:center; opacity:0.3">En attente de pairs...</div>';
+            `).join('');
+        }
+
+        function renderFiles(files) {
+            const fileListEl = document.getElementById('fileList');
+            if (files.length === 0) {
+                fileListEl.innerHTML = '<div style="opacity:0.3; font-size:11px; text-align:center">Aucun fichier...</div>';
+                return;
+            }
+            fileListEl.innerHTML = files.map(f => `
+                <div class="peer-item" style="cursor:default">
+                    <div class="peer-name">📄 ${f.file_name}</div>
+                    <div class="peer-status">${(f.file_size / 1024).toFixed(1)} KB | ${f.location === 'local' ? '✅ Partagé' : '☁️ Distant'}</div>
+                    ${f.location === 'remote' ? `<button onclick="downloadFile('${f.file_id}', '${f.fromNodeId}')" style="width:100%; height:25px; border-radius:5px; font-size:10px; margin-top:5px">Télécharger</button>` : ''}
+                    <div id="progress-${f.file_id}" style="height:4px; background:var(--accent); width:0%; margin-top:5px; transition:width 0.3s; display:none"></div>
+                </div>
+            `).join('');
+        }
+
+        async function downloadFile(fileId, fromNodeId) {
+            const progress = document.getElementById(`progress-${fileId}`);
+            if (progress) progress.style.display = 'block';
+
+            await fetch('/api/download', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileId, fromNodeId })
+            });
         }
 
         async function selectPeer(nodeId) {
@@ -273,7 +330,7 @@
         async function loadMessages() {
             const res = await fetch('/api/messages');
             const messages = await res.json();
-            
+
             chatMessagesEl.innerHTML = messages
                 .filter(m => m.from === currentPeer || m.to === currentPeer)
                 .map(m => `
@@ -289,22 +346,35 @@
 
         async function sendMessage() {
             const text = messageInput.value.trim();
-            if (!text || !currentPeer) return;
-            
-            messageInput.value = '';
-            
-            // Optimistic Update
-            renderMessage({ from: 'MOI', message: text, timestamp: Date.now() });
+            if (!text) return;
+            if (!currentPeer) {
+                alert("⚠️ Veuillez sélectionner un pair dans la liste à gauche d'abord.");
+                return;
+            }
 
-            await fetch('/api/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nodeId: currentPeer, message: text })
-            });
+            messageInput.value = '';
+
+            // Le rendu sera fait via Socket.io pour être sûr de la cohérence
+            try {
+                const res = await fetch('/api/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nodeId: currentPeer, message: text })
+                });
+                const result = await res.json();
+                if (!result.success) alert("Erreur: " + result.error);
+            } catch (e) {
+                alert("Erreur connexion API");
+            }
         }
 
         function renderMessage(m) {
+            // Évite les doublons si le socket revient trop vite
+            const msgId = `msg-${m.timestamp}`;
+            if (document.getElementById(msgId)) return;
+
             const el = document.createElement('div');
+            el.id = msgId;
             el.className = `message ${m.from === 'MOI' ? 'sent' : 'received'}`;
             el.innerHTML = `
                 ${m.message}
@@ -318,21 +388,39 @@
 
         // Socket Events
         socket.on('new_message', (msg) => {
-            if (msg.from === currentPeer || msg.from === myNodeId) {
-                loadMessages();
+            // On ne rend que si c'est pour la conversation active
+            if (msg.from === currentPeer || msg.to === currentPeer) {
+                renderMessage(msg);
             }
         });
 
-        socket.on('new_peer', () => fetchPeers());
+        socket.on('new_peer', () => { fetchPeers(); fetchFiles(); });
+
+        socket.on('download_progress', (data) => {
+            const progress = document.getElementById(`progress-${data.fileId}`);
+            if (progress) {
+                progress.style.display = 'block';
+                progress.style.width = `${(data.downloaded / data.total) * 100}%`;
+            }
+        });
+
+        socket.on('download_complete', (data) => {
+            const progress = document.getElementById(`progress-${data.fileId}`);
+            if (progress) progress.style.background = '#4ade80';
+            alert(`✅ Téléchargement terminé !\nFichier enregistré dans : ${data.path}`);
+            fetchFiles();
+        });
 
         // Event Listeners
         sendBtn.onclick = sendMessage;
-        messageInput.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+        messageInput.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
 
         // Init
         fetchStatus();
         fetchPeers();
-        setInterval(fetchPeers, 10000); // Polling backup
+        fetchFiles();
+        setInterval(() => { fetchPeers(); fetchFiles(); }, 5000); 
     </script>
 </body>
+
 </html>

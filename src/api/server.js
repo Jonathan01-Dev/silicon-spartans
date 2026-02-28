@@ -14,7 +14,8 @@ import { TcpServer } from '../network/tcp-server.js';
 import { Messenger } from '../messaging/messenger.js';
 import { peerTable } from '../network/peer-table.js';
 import { initDatabase, getHistory } from '../database/db.js';
-import { listAllFiles } from '../transfer/file-index.js';
+import { listAllFiles, indexSharedFiles } from '../transfer/file-index.js';
+import { downloadFile } from '../transfer/transfer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -29,6 +30,10 @@ app.use(express.static(path.join(__dirname, '../../public')));
 
 async function startArchipelEngine() {
     await initDatabase();
+
+    // Mission : Indexation des fichiers locaux pour partage décentralisé
+    indexSharedFiles();
+
     const identity = loadOrCreateIdentity();
 
     const tcpServer = new TcpServer(identity, (msgInfo) => {
@@ -69,9 +74,44 @@ async function startArchipelEngine() {
 
     app.post('/api/send', async (req, res) => {
         const { nodeId, message } = req.body;
+        if (!nodeId || !message) {
+            return res.status(400).json({ error: "NodeId et Message requis" });
+        }
         try {
             const result = await messenger.send(nodeId, message);
+
+            // On signale au frontend (pour toutes les fenêtres ouvertes)
+            io.emit('new_message', {
+                from: 'MOI',
+                to: nodeId,
+                message: result.relayed ? `(Relais) ${message}` : message,
+                timestamp: Date.now()
+            });
+
             res.json({ success: true, ...result });
+        } catch (err) {
+            console.error(`[API] ❌ Erreur d'envoi:`, err.message);
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // Mission : Téléchargement P2P (Chunking) via API
+    app.post('/api/download', async (req, res) => {
+        const { fileId, fromNodeId } = req.body;
+        const allFiles = listAllFiles();
+        const file = allFiles.find(f => f.file_id === fileId && f.location === 'remote');
+
+        if (!file) return res.status(404).json({ error: "Fichier non trouvé" });
+
+        try {
+            // Lancement du téléchargement parallèle (Mission : Chunking)
+            downloadFile(tcpServer, fromNodeId, file, identity.nodeId, (downloaded, total) => {
+                io.emit('download_progress', { fileId, downloaded, total });
+            }).then(downloadPath => {
+                io.emit('download_complete', { fileId, path: downloadPath });
+            });
+
+            res.json({ success: true, message: "Téléchargement lancé" });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }
