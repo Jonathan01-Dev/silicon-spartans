@@ -103,10 +103,29 @@
         const chatMessagesEl = document.getElementById('chatMessages'); const messageInput = document.getElementById('messageInput');
         const activePeerName = document.getElementById('activePeerName');
 
-        // --- WEB-RTC VIDEO (VERSION ULTIME ROBUSTE) ---
+        // --- WEB-RTC VIDEO (VERSION ULTRA-ROBUSTE LAN) ---
         let localStream, peerConnection;
-        const iceConfig = { iceServers: [] }; 
-        let processedSignals = new Set(); // Pour éviter de traiter les vieux signaux de l'historique
+        const iceConfig = { iceServers: [], iceCandidatePoolSize: 10 }; 
+        let processedSignals = new Set();
+
+        async function createPeerConnection(targetId) {
+            if (peerConnection) peerConnection.close();
+            peerConnection = new RTCPeerConnection(iceConfig);
+
+            // Gestion des flux
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            peerConnection.ontrack = e => { 
+                console.log("Flux distant reçu !");
+                document.getElementById('remoteVideo').srcObject = e.streams[0]; 
+            };
+
+            // Échange des candidats ICE
+            peerConnection.onicecandidate = e => {
+                if (e.candidate) sendSignal(targetId, { type: 'candidate', candidate: e.candidate });
+            };
+
+            return peerConnection;
+        }
 
         async function startVideoCall() {
             if (!currentPeer) return alert("Sélectionnez un pair");
@@ -114,37 +133,36 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('localVideo').srcObject = localStream;
-                peerConnection = new RTCPeerConnection(iceConfig);
-                localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
-                peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-                peerConnection.onicecandidate = e => { if (e.candidate) sendSignal(currentPeer, { type: 'candidate', candidate: e.candidate }); };
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
+                
+                const pc = await createPeerConnection(currentPeer);
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
                 sendSignal(currentPeer, { type: 'offer', offer });
-            } catch (e) { alert("Caméra bloquée."); endVideoCall(); }
+            } catch (e) { alert("Caméra bloquée ou non-sécurisée (vérifiez chrome://flags)"); endVideoCall(); }
         }
 
         async function handleVideoSignal(fromNodeId, signal) {
             try {
                 if (signal.type === 'offer') {
-                    if (confirm("Appel vidéo entrant de " + fromNodeId.slice(0,8) + "... Accepter ?")) {
-                        currentPeer = fromNodeId; // On cible l'appelant
+                    if (confirm("Appel vidéo entrant. Accepter ?")) {
+                        currentPeer = fromNodeId;
                         renderPeers();
                         document.getElementById('videoOverlay').style.display = 'flex';
                         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                         document.getElementById('localVideo').srcObject = localStream;
-                        peerConnection = new RTCPeerConnection(iceConfig);
-                        localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
-                        peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-                        peerConnection.onicecandidate = e => { if (e.candidate) sendSignal(fromNodeId, { type: 'candidate', candidate: e.candidate }); };
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.offer));
-                        const answer = await peerConnection.createAnswer();
-                        await peerConnection.setLocalDescription(answer);
+
+                        const pc = await createPeerConnection(fromNodeId);
+                        await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
+                        const answer = await pc.createAnswer();
+                        await pc.setLocalDescription(answer);
                         sendSignal(fromNodeId, { type: 'answer', answer });
                     }
                 } else if (peerConnection) {
-                    if (signal.type === 'answer') await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer));
-                    else if (signal.type === 'candidate') await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                    if (signal.type === 'answer') {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                    } else if (signal.type === 'candidate') {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+                    }
                 }
             } catch (e) { console.error("WebRTC Error:", e); }
         }
@@ -218,7 +236,6 @@
         }
 
         function formatMessage(from, text, ts) {
-            // Signal Vidéo : On ne le traite que s'il est RÉCENT (< 10s) et pas déjà traité
             if (text.startsWith('[SIGNAL_VIDEO]')) { 
                 const sigId = from + ts;
                 if (!processedSignals.has(sigId) && (Date.now() - ts < 10000)) {
