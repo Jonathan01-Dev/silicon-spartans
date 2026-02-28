@@ -59,4 +59,10 @@ npm run start-cli
 ---
 
 **Propulsé par l'innovation et la résilience.**  
-*Team ARCHIPEL — LBS Hackathon 2026*
+
+### 👥 Équipe ARCHIPEL — LBS Hackathon 2026
+- **N'DJANOUNAI Hiwe**
+- **AHOLOU Yawo Joel Samuel**
+- **BONI Solkem Ketsia**
+- **LAWSON Kenneth Anani Beinjamain**
+
