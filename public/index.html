@@ -12,11 +12,7 @@
             --received: rgba(255, 255, 255, 0.05); --ai-glow: #ff007a;
         }
         * { box-sizing: border-box; transition: all 0.2s ease-out; }
-        body {
-            margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text);
-            display: flex; height: 100vh; overflow: hidden;
-            background-image: radial-gradient(at 0% 0%, rgba(112, 0, 255, 0.1) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(0, 212, 255, 0.1) 0px, transparent 50%);
-        }
+        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; background-image: radial-gradient(at 0% 0%, rgba(112, 0, 255, 0.1) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(0, 212, 255, 0.1) 0px, transparent 50%); }
         .sidebar { width: 350px; background: var(--sidebar); border-right: 1px solid var(--glass-border); display: flex; flex-direction: column; padding: 24px; z-index: 10; }
         .logo { font-size: 26px; font-weight: 800; letter-spacing: -1px; margin-bottom: 32px; display: flex; align-items: center; gap: 12px; }
         .logo span { color: var(--accent); text-shadow: 0 0 15px var(--accent-glow); }
@@ -61,10 +57,7 @@
         <div class="peer-list" id="fileList"></div>
         <div style="margin-top:auto; padding:16px; background:var(--glass); border-radius:16px; border:1px solid var(--glass-border)">
             <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:10px">CONNEXION MANUELLE</div>
-            <div style="display:flex; gap:8px">
-                <input type="text" id="manualIp" placeholder="IP locale" style="flex:1; background:rgba(0,0,0,0.2); border:1px solid var(--glass-border); border-radius:8px; padding:8px; color:white; font-size:12px">
-                <button onclick="manualConnect()" style="background:var(--accent); border:none; border-radius:8px; width:36px; cursor:pointer">+</button>
-            </div>
+            <div style="display:flex; gap:8px"><input type="text" id="manualIp" placeholder="IP locale" style="flex:1; background:rgba(0,0,0,0.2); border:1px solid var(--glass-border); border-radius:8px; padding:8px; color:white; font-size:12px"><button onclick="manualConnect()" style="background:var(--accent); border:none; border-radius:8px; width:36px; cursor:pointer">+</button></div>
             <div id="myNodeId" style="font-size:9px; color:var(--text-dim); margin-top:12px; font-family:monospace">ID: ...</div>
         </div>
     </div>
@@ -103,27 +96,17 @@
         const chatMessagesEl = document.getElementById('chatMessages'); const messageInput = document.getElementById('messageInput');
         const activePeerName = document.getElementById('activePeerName');
 
-        // --- WEB-RTC VIDEO (VERSION ULTRA-ROBUSTE LAN) ---
+        // --- WEB-RTC VIDEO (VERSION SURVIE HACKATHON) ---
         let localStream, peerConnection;
-        const iceConfig = { iceServers: [], iceCandidatePoolSize: 10 }; 
+        const iceConfig = { iceServers: [] }; 
         let processedSignals = new Set();
 
         async function createPeerConnection(targetId) {
             if (peerConnection) peerConnection.close();
             peerConnection = new RTCPeerConnection(iceConfig);
-
-            // Gestion des flux
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-            peerConnection.ontrack = e => { 
-                console.log("Flux distant reçu !");
-                document.getElementById('remoteVideo').srcObject = e.streams[0]; 
-            };
-
-            // Échange des candidats ICE
-            peerConnection.onicecandidate = e => {
-                if (e.candidate) sendSignal(targetId, { type: 'candidate', candidate: e.candidate });
-            };
-
+            peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+            peerConnection.onicecandidate = e => { if (e.candidate) sendSignal(targetId, { type: 'candidate', candidate: e.candidate }); };
             return peerConnection;
         }
 
@@ -133,24 +116,21 @@
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('localVideo').srcObject = localStream;
-                
                 const pc = await createPeerConnection(currentPeer);
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
                 sendSignal(currentPeer, { type: 'offer', offer });
-            } catch (e) { alert("Caméra bloquée ou non-sécurisée (vérifiez chrome://flags)"); endVideoCall(); }
+            } catch (e) { alert("ERREUR : Caméra bloquée par Chrome. Allez sur chrome://flags/#unsafely-treat-insecure-origin-as-secure et autorisez l'IP du PC."); endVideoCall(); }
         }
 
         async function handleVideoSignal(fromNodeId, signal) {
             try {
                 if (signal.type === 'offer') {
                     if (confirm("Appel vidéo entrant. Accepter ?")) {
-                        currentPeer = fromNodeId;
-                        renderPeers();
+                        currentPeer = fromNodeId; renderPeers();
                         document.getElementById('videoOverlay').style.display = 'flex';
                         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                         document.getElementById('localVideo').srcObject = localStream;
-
                         const pc = await createPeerConnection(fromNodeId);
                         await pc.setRemoteDescription(new RTCSessionDescription(signal.offer));
                         const answer = await pc.createAnswer();
@@ -158,18 +138,13 @@
                         sendSignal(fromNodeId, { type: 'answer', answer });
                     }
                 } else if (peerConnection) {
-                    if (signal.type === 'answer') {
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer));
-                    } else if (signal.type === 'candidate') {
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
-                    }
+                    if (signal.type === 'answer') await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                    else if (signal.type === 'candidate') await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
                 }
             } catch (e) { console.error("WebRTC Error:", e); }
         }
 
-        async function sendSignal(to, signal) { 
-            await fetch('/api/video/signal', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ targetNodeId: to, signal }) }); 
-        }
+        async function sendSignal(to, signal) { await fetch('/api/video/signal', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ targetNodeId: to, signal }) }); }
         function endVideoCall() { if (localStream) localStream.getTracks().forEach(t => t.stop()); if (peerConnection) peerConnection.close(); peerConnection = null; document.getElementById('videoOverlay').style.display = 'none'; }
 
         // --- IA OFFLINE ---
