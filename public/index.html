@@ -17,6 +17,7 @@
             --glass-border: rgba(255, 255, 255, 0.08);
             --sent: linear-gradient(135deg, #00d4ff 0%, #0082ff 100%);
             --received: rgba(255, 255, 255, 0.05);
+            --ai-glow: #ff007a;
         }
 
         * { box-sizing: border-box; transition: all 0.2s ease-out; }
@@ -117,12 +118,13 @@
         }
 
         .message {
-            max-width: 65%;
+            max-width: 75%;
             padding: 14px 20px;
             border-radius: 20px;
             font-size: 15px;
             line-height: 1.6;
             animation: slideUp 0.3s ease-out;
+            position: relative;
         }
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -141,6 +143,14 @@
             border-bottom-left-radius: 4px;
         }
 
+        /* Message IA Spécial */
+        .message.ai-msg {
+            background: rgba(255, 0, 122, 0.05);
+            border: 1px solid var(--ai-glow);
+            box-shadow: 0 0 15px rgba(255, 0, 122, 0.15);
+            color: #ffb3d9;
+        }
+
         .chat-input-container {
             padding: 24px 32px;
             background: rgba(11, 14, 20, 0.8);
@@ -148,7 +158,7 @@
             border-top: 1px solid var(--glass-border);
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 16px;
         }
 
         .input-wrapper {
@@ -185,12 +195,7 @@
             position: relative;
         }
         #voiceBtn.recording { background: #ef4444; border-color: #ef4444; animation: pulseRecord 1.5s infinite; color: white; }
-        @keyframes pulseRecord { 
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); transform: scale(1); }
-            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); transform: scale(1.1); }
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); transform: scale(1); }
-        }
-
+        
         .recording-timer {
             position: absolute;
             top: -45px;
@@ -203,7 +208,6 @@
             font-size: 11px;
             font-weight: 800;
             display: none;
-            white-space: nowrap;
         }
 
         .action-btn {
@@ -255,7 +259,6 @@
             border-radius: 30px;
             overflow: hidden;
             border: 2px solid var(--glass-border);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
 
         #remoteVideo { width: 100%; height: 100%; object-fit: cover; }
@@ -269,37 +272,13 @@
             border-radius: 20px;
             object-fit: cover;
             border: 2px solid var(--accent);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .video-controls {
-            margin-top: 30px;
-            display: flex;
-            gap: 20px;
         }
 
         .hangup-btn {
-            background: #ef4444;
-            color: white;
-            border: none;
-            padding: 15px 40px;
-            border-radius: 50px;
-            font-weight: 800;
-            cursor: pointer;
-            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+            background: #ef4444; color: white; border: none; padding: 15px 40px; border-radius: 50px; font-weight: 800; cursor: pointer; margin-top: 30px;
         }
 
-        .file-progress { height: 4px; background: var(--accent); width: 0%; border-radius: 2px; margin-top: 8px; display: none; }
-        
-        /* Message Image Style */
-        .chat-image {
-            width: 100%;
-            max-width: 300px;
-            border-radius: 12px;
-            margin-top: 10px;
-            cursor: pointer;
-            border: 1px solid var(--glass-border);
-        }
+        .chat-image { width: 100%; max-width: 300px; border-radius: 12px; margin-top: 10px; cursor: pointer; }
     </style>
 </head>
 
@@ -315,9 +294,9 @@
         <div class="peer-list" id="fileList"></div>
 
         <div style="margin-top:auto; padding:16px; background:var(--glass); border-radius:16px; border:1px solid var(--glass-border)">
-            <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:10px">CONNEXION MANUELLE</div>
+            <div style="font-size:10px; color:var(--accent); font-weight:800; margin-bottom:10px">SOUVERAINETÉ LOCALE</div>
             <div style="display:flex; gap:8px">
-                <input type="text" id="manualIp" placeholder="IP locale" style="flex:1; background:rgba(0,0,0,0.2); border:1px solid var(--glass-border); border-radius:8px; padding:8px; color:white; font-size:12px">
+                <input type="text" id="manualIp" placeholder="IP Manuelle" style="flex:1; background:rgba(0,0,0,0.2); border:1px solid var(--glass-border); border-radius:8px; padding:8px; color:white; font-size:12px">
                 <button onclick="manualConnect()" style="background:var(--accent); border:none; border-radius:8px; width:36px; cursor:pointer">+</button>
             </div>
             <div id="myNodeId" style="font-size:9px; color:var(--text-dim); margin-top:12px; font-family:monospace">ID: ...</div>
@@ -327,12 +306,12 @@
     <div class="main">
         <div class="chat-header">
             <div>
-                <div id="activePeerName" style="font-weight:700; font-size:18px">Choisir un pair</div>
-                <div id="encryptStatus" style="font-size:11px; color:var(--accent)">MODE P2P SÉCURISÉ</div>
+                <div id="activePeerName" style="font-weight:700; font-size:18px">Espace Chiffré</div>
+                <div id="encryptStatus" style="font-size:11px; color:var(--accent)">AUCUN SERVEUR • 100% P2P</div>
             </div>
             <div style="display:flex; gap:10px">
+                <button onclick="askAI()" class="action-btn" title="Assistant IA" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:#ff007a; border-color:#ff007a">🤖 IA SOUVERAINE</button>
                 <button onclick="startVideoCall()" class="action-btn" title="Appel Vidéo" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:#4ade80; border-color:#4ade80">📹 VIDÉO</button>
-                <button onclick="askAI()" class="action-btn" title="Assistant IA" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:#ff007a; border-color:#ff007a">🤖 IA</button>
                 <button onclick="toggleBroadcastMode()" id="broadcastToggle" class="action-btn" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:#ffb800; border-color:#ffb800">📢 TOUS</button>
                 <button onclick="toggleMap()" class="action-btn" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:var(--accent)">🕸️ RÉSEAU</button>
             </div>
@@ -343,11 +322,11 @@
         <div class="chat-input-container">
             <input type="file" id="fileInput" style="display:none" onchange="uploadAndSend()">
             <button class="action-btn" onclick="document.getElementById('fileInput').click()" title="Joindre">📎</button>
-            <button class="action-btn" onclick="takePhoto()" title="Prendre une Photo">📷</button>
-            <button class="action-btn" onclick="shareLocation()" title="Localisation">📍</button>
+            <button class="action-btn" onclick="takePhoto()" title="Photo">📷</button>
+            <button class="action-btn" onclick="shareLocation()" title="GPS">📍</button>
             
             <div class="input-wrapper">
-                <input type="text" id="messageInput" placeholder="Message..." autocomplete="off">
+                <input type="text" id="messageInput" placeholder="Tapez votre message..." autocomplete="off">
             </div>
 
             <div style="position:relative">
@@ -363,19 +342,16 @@
         </div>
     </div>
 
-    <!-- Vidéo Call Overlay -->
+    <!-- Video Call Overlay -->
     <div id="videoOverlay" style="display:none">
-        <h2 style="color:var(--accent); margin-bottom:20px; font-weight:800">🏝️ APPEL VIDÉO SOUVERAIN (P2P)</h2>
+        <h2 style="color:var(--accent); font-weight:800">🏝️ APPEL VIDÉO SOUVERAIN</h2>
         <div class="video-container">
             <video id="remoteVideo" autoplay playsinline></video>
             <video id="localVideo" autoplay playsinline muted></video>
         </div>
-        <div class="video-controls">
-            <button class="hangup-btn" onclick="endVideoCall()">RACCROCHER</button>
-        </div>
+        <button class="hangup-btn" onclick="endVideoCall()">RACCROCHER</button>
     </div>
 
-    <!-- Hidden video/canvas for instant photo -->
     <video id="hiddenVideo" style="display:none" autoplay></video>
     <canvas id="hiddenCanvas" style="display:none"></canvas>
 
@@ -397,14 +373,54 @@
         let myNodeId = "";
         let allPeers = [];
 
-        // Elements UI
+        // UI
         const peerListEl = document.getElementById('peerList');
         const chatMessagesEl = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
         const activePeerName = document.getElementById('activePeerName');
 
-        // --- INSTANT PHOTO ---
+        // --- IA OFFLINE CHIC ---
+        async function askAI() {
+            const question = prompt("🤖 Assistant IA SOUVERAINE (100% OFFLINE)\nQue souhaitez-vous savoir sur ARCHIPEL ?");
+            if (!question) return;
+
+            // Ajout du message "Moi" à l'IA
+            const myMsg = document.createElement('div');
+            myMsg.className = 'message sent';
+            myMsg.innerHTML = `<b>Moi ➔ IA :</b> ${question}`;
+            chatMessagesEl.appendChild(myMsg);
+
+            // Création de la bulle IA "Thinking"
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'message received ai-msg';
+            aiMsg.innerHTML = `<b>🤖 IA ARCHIPEL</b><br><i>Analyse des données locales...</i>`;
+            chatMessagesEl.appendChild(aiMsg);
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+
+            try {
+                const res = await fetch('/api/ai/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+                const data = await res.json();
+                
+                // Simulation de frappe pour le côté "Chic"
+                let i = 0;
+                const text = data.answer;
+                aiMsg.innerHTML = `<b>🤖 IA ARCHIPEL</b><br>`;
+                const interval = setInterval(() => {
+                    aiMsg.innerHTML += text.charAt(i).replace('\n', '<br>');
+                    i++;
+                    chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+                    if (i >= text.length) clearInterval(interval);
+                }, 15);
+
+            } catch (e) { aiMsg.innerHTML = `<b>🤖 IA</b><br>Erreur connexion locale.`; }
+        }
+
+        // --- PHOTO ---
         async function takePhoto() {
             if (!currentPeer) return alert("Sélectionnez un pair");
             try {
@@ -412,44 +428,28 @@
                 const video = document.getElementById('hiddenVideo');
                 const canvas = document.getElementById('hiddenCanvas');
                 video.srcObject = stream;
-                
-                // On attend que la caméra soit prête
                 setTimeout(async () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                     canvas.getContext('2d').drawImage(video, 0, 0);
-                    
                     const photoData = canvas.toDataURL('image/jpeg', 0.8);
-                    
-                    await fetch('/api/photo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ targetNodeId: currentPeer, photoData })
-                    });
-                    
-                    // On coupe la caméra
+                    await fetch('/api/photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetNodeId: currentPeer, photoData }) });
                     stream.getTracks().forEach(track => track.stop());
                 }, 1000);
-            } catch (e) {
-                alert("Erreur caméra : " + e.message);
-            }
+            } catch (e) { alert("Caméra bloquée"); }
         }
 
-        // --- VIDÉO CALL CORE ---
-        let localStream;
-        let peerConnection;
-        const iceConfig = { iceServers: [] }; 
-
+        // --- VIDEO CALL ---
+        let localStream, peerConnection;
         async function startVideoCall() {
-            if (!currentPeer) return alert("Sélectionnez un pair d'abord");
+            if (!currentPeer) return alert("Pair requis");
             document.getElementById('videoOverlay').style.display = 'flex';
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('localVideo').srcObject = localStream;
-                peerConnection = new RTCPeerConnection(iceConfig);
-                localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-                peerConnection.ontrack = event => { document.getElementById('remoteVideo').srcObject = event.streams[0]; };
-                peerConnection.onicecandidate = event => { if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate }); };
+                peerConnection = new RTCPeerConnection();
+                localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+                peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+                peerConnection.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', candidate: e.candidate }); };
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
                 sendSignal({ type: 'offer', offer });
@@ -457,110 +457,66 @@
         }
 
         async function handleVideoSignal(signal) {
-            if (!peerConnection) {
-                if (signal.type === 'offer') {
-                    if (!confirm("Appel vidéo entrant. Accepter ?")) return;
-                    document.getElementById('videoOverlay').style.display = 'flex';
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                    document.getElementById('localVideo').srcObject = localStream;
-                    peerConnection = new RTCPeerConnection(iceConfig);
-                    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-                    peerConnection.ontrack = event => { document.getElementById('remoteVideo').srcObject = event.streams[0]; };
-                    peerConnection.onicecandidate = event => { if (event.candidate) sendSignal({ type: 'candidate', candidate: event.candidate }); };
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.offer));
-                    const answer = await peerConnection.createAnswer();
-                    await peerConnection.setLocalDescription(answer);
-                    sendSignal({ type: 'answer', answer });
-                }
-            } else {
-                if (signal.type === 'answer') { await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer)); }
-                else if (signal.type === 'candidate') { await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate)); }
+            if (!peerConnection && signal.type === 'offer') {
+                if (!confirm("Vidéo entrante. Accepter ?")) return;
+                document.getElementById('videoOverlay').style.display = 'flex';
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+                peerConnection = new RTCPeerConnection();
+                localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+                peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
+                peerConnection.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', candidate: e.candidate }); };
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                sendSignal({ type: 'answer', answer });
+            } else if (peerConnection) {
+                if (signal.type === 'answer') await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer));
+                else if (signal.type === 'candidate') await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
             }
         }
 
-        async function sendSignal(signal) {
-            await fetch('/api/video/signal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetNodeId: currentPeer, signal }) });
-        }
+        async function sendSignal(signal) { await fetch('/api/video/signal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ targetNodeId: currentPeer, signal }) }); }
+        function endVideoCall() { if (localStream) localStream.getTracks().forEach(t => t.stop()); if (peerConnection) peerConnection.close(); peerConnection = null; document.getElementById('videoOverlay').style.display = 'none'; }
 
-        function endVideoCall() {
-            if (localStream) localStream.getTracks().forEach(t => t.stop());
-            if (peerConnection) peerConnection.close();
-            peerConnection = null;
-            document.getElementById('videoOverlay').style.display = 'none';
-        }
-
-        // --- INITIALISATION ---
-        async function fetchStatus() {
-            const res = await fetch('/api/status');
-            const data = await res.json();
-            myNodeId = data.nodeId;
-            document.getElementById('myNodeId').innerText = `ID: ${myNodeId.slice(0, 24)}...`;
-        }
-
-        async function fetchPeers() {
-            const res = await fetch('/api/peers');
-            allPeers = await res.json();
-            renderPeers();
-        }
-
-        async function fetchFiles() {
-            const res = await fetch('/api/files');
-            const files = await res.json();
-            renderFiles(files);
-        }
+        // --- CORE FUNCTIONS ---
+        async function fetchStatus() { const res = await fetch('/api/status'); const data = await res.json(); myNodeId = data.nodeId; document.getElementById('myNodeId').innerText = `ID: ${myNodeId.slice(0, 24)}...`; }
+        async function fetchPeers() { const res = await fetch('/api/peers'); allPeers = await res.json(); renderPeers(); }
+        async function fetchFiles() { const res = await fetch('/api/files'); const files = await res.json(); renderFiles(files); }
 
         function renderPeers() {
             const query = document.getElementById('peerSearch').value.toLowerCase();
-            const filtered = allPeers.filter(p => p.nodeId.toLowerCase().includes(query) || p.ip.includes(query));
-            peerListEl.innerHTML = filtered.map(p => {
-                const isActive = currentPeer === p.nodeId;
-                return `<div class="peer-item ${isActive ? 'active' : ''}" onclick="selectPeer('${p.nodeId}')">
+            peerListEl.innerHTML = allPeers.filter(p => p.nodeId.toLowerCase().includes(query) || p.ip.includes(query)).map(p => `
+                <div class="peer-item ${currentPeer === p.nodeId ? 'active' : ''}" onclick="selectPeer('${p.nodeId}')">
                     <div class="peer-avatar" style="background:${getPeerColor(p.nodeId)}">${p.nodeId.slice(0, 1).toUpperCase()}</div>
                     <div style="flex:1">
                         <div style="font-weight:700; font-size:14px">${p.nodeId.slice(0, 16)}...</div>
                         <div style="font-size:11px; color:var(--text-dim)">${p.ip}</div>
                     </div>
-                </div>`;
-            }).join('');
+                </div>`).join('');
         }
 
-        function getPeerColor(id) {
-            const colors = ['#00d4ff', '#7000ff', '#ff007a', '#00ff95'];
-            let h = 0; for(let i=0; i<id.length; i++) h += id.charCodeAt(i);
-            return colors[h % colors.length];
-        }
+        function getPeerColor(id) { const colors=['#00d4ff','#7000ff','#ff007a','#00ff95']; let h=0; for(let i=0;i<id.length;i++)h+=id.charCodeAt(i); return colors[h%colors.length]; }
 
         function renderFiles(files) {
-            const fileListEl = document.getElementById('fileList');
-            fileListEl.innerHTML = files.map(f => {
-                const isLocal = f.location === 'local';
-                const url = isLocal ? `/shared/${encodeURIComponent(f.file_name)}` : `/downloads/${encodeURIComponent(f.file_name)}`;
-                return `<div class="peer-item" style="padding:10px; cursor:default">
+            document.getElementById('fileList').innerHTML = files.map(f => `
+                <div class="peer-item" style="padding:10px; cursor:default">
                     <div style="flex:1">
                         <div style="font-weight:600; font-size:12px">📄 ${f.file_name}</div>
                         <div style="display:flex; gap:8px; margin-top:8px">
-                            ${f.location === 'remote' ? `<button onclick="downloadFile('${f.file_id}', '${f.fromNodeId}')" style="background:var(--accent); border:none; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer">TÉLÉCHARGER</button>` : ''}
-                            <button onclick="window.open('${url}', '_blank')" style="background:var(--glass); border:1px solid var(--glass-border); color:white; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer">OUVRIR</button>
+                            ${f.location==='remote'?`<button onclick="downloadFile('${f.file_id}','${f.fromNodeId}')" style="background:var(--accent); border:none; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer">DL</button>`:''}
+                            <button onclick="window.open('${f.location==='local'?'/shared/':'/downloads/'}${encodeURIComponent(f.file_name)}','_blank')" style="background:var(--glass); border:1px solid var(--glass-border); color:white; padding:4px 8px; border-radius:4px; font-size:10px; cursor:pointer">OUVRIR</button>
                         </div>
                         <div id="progress-${f.file_id}" class="file-progress"></div>
                     </div>
-                </div>`;
-            }).join('');
+                </div>`).join('');
         }
 
-        async function selectPeer(nodeId) {
-            currentPeer = nodeId;
-            activePeerName.innerText = `Chat avec ${nodeId.slice(0, 12)}...`;
-            renderPeers();
-            loadMessages();
-        }
-
+        async function selectPeer(id) { currentPeer = id; activePeerName.innerText = `Chat avec ${id.slice(0, 12)}...`; renderPeers(); loadMessages(); }
         async function loadMessages() {
-            const res = await fetch('/api/messages');
-            const messages = await res.json();
-            chatMessagesEl.innerHTML = messages
-                .filter(m => m.from === currentPeer || m.to === currentPeer)
-                .map(m => `<div class="message ${m.from === 'MOI' ? 'sent' : 'received'}">
+            const res = await fetch('/api/messages'); const messages = await res.json();
+            chatMessagesEl.innerHTML = messages.filter(m => m.from === currentPeer || m.to === currentPeer || m.to === 'TOUT LE MONDE').map(m => `
+                <div class="message ${m.from === 'MOI' ? 'sent' : 'received'}">
                     ${formatMessage(m.message)}
                     <div style="font-size:9px; opacity:0.5; margin-top:6px; text-align:right">${new Date(m.timestamp).toLocaleTimeString()}</div>
                 </div>`).join('');
@@ -568,229 +524,88 @@
         }
 
         function formatMessage(text) {
-            if (text.startsWith('[SIGNAL_VIDEO]')) {
-                try { handleVideoSignal(JSON.parse(text.replace('[SIGNAL_VIDEO]', ''))); } catch(e){}
-                return `<i>📹 Signal d'appel vidéo reçu</i>`;
-            }
-
-            // Détection PHOTO
+            if (text.startsWith('[SIGNAL_VIDEO]')) { try { handleVideoSignal(JSON.parse(text.replace('[SIGNAL_VIDEO]', ''))); } catch(e){} return `<i>📹 Appel vidéo en cours...</i>`; }
             if (text.includes('🖼️ Photo')) {
-                const fileName = text.split(': ')[1];
-                const isSent = text.includes('envoyée');
-                const url = isSent ? `/shared/${fileName}` : `/downloads/${fileName}`;
-                return `<b>${isSent ? '🖼️ PHOTO ENVOYÉE' : '🖼️ PHOTO REÇUE'}</b><br>
-                        <img src="${url}" class="chat-image" onclick="window.open('${url}', '_blank')" onerror="this.src='https://via.placeholder.com/150?text=Attente+P2P...'">`;
+                const fn = text.split(': ')[1]; const isS = text.includes('envoyée'); const url = isS ? `/shared/${fn}` : `/downloads/${fn}`;
+                return `<b>${isS?'🖼️ PHOTO ENVOYÉE':'🖼️ PHOTO REÇUE'}</b><br><img src="${url}" class="chat-image" onclick="window.open('${url}','_blank')">`;
             }
-
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             let formatted = text.replace(urlRegex, (url) => `<a href="${url}" target="_blank" style="color:var(--accent); font-weight:700">${url}</a>`);
-
             if (text.includes('🎤 Message vocal :')) {
-                const fileName = text.split(': ')[1];
-                formatted = `<div style="display:flex; align-items:center; gap:12px">
-                    <button onclick="downloadAndPlay('${fileName}')" style="background:white; border:none; width:34px; height:34px; border-radius:50%; cursor:pointer; font-weight:800">▶</button>
-                    <div><b>VOCAL REÇU</b><br><span style="font-size:10px; opacity:0.7">Prêt à écouter</span></div>
-                </div>`;
+                const fn = text.split(': ')[1];
+                formatted = `<div style="display:flex; align-items:center; gap:12px"><button onclick="downloadAndPlay('${fn}')" style="background:white; border:none; width:34px; height:34px; border-radius:50%; cursor:pointer; font-weight:800">▶</button><div><b>VOCAL</b><br><span style="font-size:10px; opacity:0.7">Prêt</span></div></div>`;
             }
-
             if (text.includes('📦 Fichier disponible')) {
-                const fileName = text.split(' : ')[1].split(' (')[0];
-                formatted = `📦 DOCUMENT PARTAGÉ : <br><b>${fileName}</b><br>
-                    <button onclick="downloadFileByName('${fileName}')" style="margin-top:10px; background:white; color:black; border:none; padding:6px 12px; border-radius:8px; font-weight:800; font-size:11px; cursor:pointer">📥 TÉLÉCHARGER</button>`;
+                const fn = text.split(' : ')[1].split(' (')[0];
+                formatted = `📦 DOCUMENT : <b>${fn}</b><br><button onclick="downloadFileByName('${fn}')" style="margin-top:10px; background:white; color:black; border:none; padding:6px 12px; border-radius:8px; font-weight:800; font-size:11px; cursor:pointer">TÉLÉCHARGER</button>`;
             }
             return formatted;
         }
 
-        // --- LOGIQUE CORE ---
         let isBroadcastMode = false;
         function toggleBroadcastMode() {
-            isBroadcastMode = !isBroadcastMode;
-            const btn = document.getElementById('broadcastToggle');
-            if (isBroadcastMode) {
-                btn.style.background = "#ffb800"; btn.style.color = "black";
-                activePeerName.innerText = "📢 DIFFUSION À TOUS";
-                currentPeer = null; renderPeers();
-            } else {
-                btn.style.background = "var(--glass)"; btn.style.color = "#ffb800";
-                activePeerName.innerText = "Choisir un pair";
-            }
+            isBroadcastMode = !isBroadcastMode; const btn = document.getElementById('broadcastToggle');
+            if (isBroadcastMode) { btn.style.background = "#ffb800"; btn.style.color = "black"; activePeerName.innerText = "📢 DIFFUSION GÉNÉRALE"; currentPeer = null; renderPeers(); }
+            else { btn.style.background = "var(--glass)"; btn.style.color = "#ffb800"; activePeerName.innerText = "Espace Chiffré"; }
         }
 
         async function sendMessage() {
-            const text = messageInput.value.trim();
-            if (!text) return;
-            if (isBroadcastMode) {
-                messageInput.value = '';
-                await fetch('/api/broadcast', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ message: text })});
-            } else {
-                if (!currentPeer) return alert("Choisissez un pair");
-                messageInput.value = '';
-                await fetch('/api/send', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ nodeId: currentPeer, message: text })});
-            }
+            const text = messageInput.value.trim(); if (!text) return;
+            if (isBroadcastMode) { messageInput.value = ''; await fetch('/api/broadcast', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ message: text })}); }
+            else { if (!currentPeer) return alert("Pair requis"); messageInput.value = ''; await fetch('/api/send', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ nodeId: currentPeer, message: text })}); }
         }
 
-        async function askAI() {
-            const question = prompt("🤖 Assistant IA ARCHIPEL (OFFLINE)\nPosez votre question :");
-            if (!question) return;
-            const thinkingMsg = document.createElement('div');
-            thinkingMsg.className = 'message received';
-            thinkingMsg.style.borderColor = '#ff007a';
-            thinkingMsg.innerHTML = `<b>🤖 IA ARCHIPEL</b><br>🤔 Réflexion...`;
-            chatMessagesEl.appendChild(thinkingMsg);
-            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-            const res = await fetch('/api/ai/ask', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ question })});
-            const data = await res.json();
-            thinkingMsg.innerHTML = `<b>🤖 IA ARCHIPEL</b><br>${data.answer.replace(/\n/g, '<br>')}`;
-            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
-        }
+        async function shareLocation() { if (!currentPeer) return alert("Pair requis"); navigator.geolocation.getCurrentPosition(pos => { const msg = `📍 Position : https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`; fetch('/api/send', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ nodeId: currentPeer, message: msg })}); }); }
+        async function uploadAndSend() { const input = document.getElementById('fileInput'); if (!input.files[0] || !currentPeer) return; const formData = new FormData(); formData.append('file', input.files[0]); formData.append('targetNodeId', currentPeer); await fetch('/api/upload', { method: 'POST', body: formData }); input.value = ''; }
 
-        async function shareLocation() {
-            if (!currentPeer) return alert("Choisissez un pair");
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(async pos => {
-                    const msg = `📍 Position : https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
-                    await fetch('/api/send', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ nodeId: currentPeer, message: msg })});
-                });
-            }
-        }
-
-        async function uploadAndSend() {
-            const input = document.getElementById('fileInput');
-            if (!input.files[0] || !currentPeer) return;
-            const formData = new FormData();
-            formData.append('file', input.files[0]);
-            formData.append('targetNodeId', currentPeer);
-            await fetch('/api/upload', { method: 'POST', body: formData });
-            input.value = '';
-        }
-
-        // --- AUDIO ---
-        let mediaRecorder; let audioChunks = []; let recordTimer;
+        // AUDIO
+        let mediaRecorder, audioChunks = [];
         async function startRecording() {
             if (!currentPeer) return;
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
+                mediaRecorder = new MediaRecorder(stream); audioChunks = [];
                 mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
                 mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const reader = new FileReader();
-                    reader.readAsDataURL(audioBlob);
-                    reader.onloadend = async () => {
-                        const base64data = reader.result.split(',')[1];
-                        await fetch('/api/voice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ targetNodeId: currentPeer, audioData: base64data })});
-                    };
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); const reader = new FileReader(); reader.readAsDataURL(audioBlob);
+                    reader.onloadend = async () => { const b64 = reader.result.split(',')[1]; await fetch('/api/voice', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ targetNodeId: currentPeer, audioData: b64 })}); };
                     stream.getTracks().forEach(t => t.stop());
                 };
-                mediaRecorder.start();
-                document.getElementById('voiceBtn').classList.add('recording');
-                document.getElementById('recordingTimer').style.display = 'block';
-                let s = 0; recordTimer = setInterval(() => {
-                    s++; const min = Math.floor(s/60).toString().padStart(2,'0'); const sec = (s%60).toString().padStart(2,'0');
-                    document.getElementById('recordingTimer').innerText = `${min}:${sec}`;
-                }, 1000);
-            } catch (e) { alert("Micro non autorisé"); }
+                mediaRecorder.start(); document.getElementById('voiceBtn').classList.add('recording'); document.getElementById('recordingTimer').style.display = 'block';
+                let s = 0; setInterval(() => { s++; const m = Math.floor(s/60).toString().padStart(2,'0'); const sec = (s%60).toString().padStart(2,'0'); document.getElementById('recordingTimer').innerText = `${m}:${sec}`; }, 1000);
+            } catch (e) {}
         }
+        function stopRecording() { if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.stop(); document.getElementById('voiceBtn').classList.remove('recording'); document.getElementById('recordingTimer').style.display = 'none'; } }
 
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-                document.getElementById('voiceBtn').classList.remove('recording');
-                document.getElementById('recordingTimer').style.display = 'none';
-                clearInterval(recordTimer);
-            }
-        }
-
-        // --- TRANSFERTS ---
-        async function downloadFile(fileId, fromNodeId) {
-            const bar = document.getElementById(`progress-${fileId}`); if (bar) bar.style.display = 'block';
-            await fetch('/api/download', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ fileId, fromNodeId })});
-        }
-
-        async function downloadFileByName(name) {
-            const res = await fetch('/api/files');
-            const files = await res.json();
-            const f = files.find(f => f.file_name === name && f.location === 'remote');
-            if (f) downloadFile(f.file_id, f.fromNodeId);
-        }
-
-        async function downloadAndPlay(name) {
-            const res = await fetch('/api/files');
-            const files = await res.json();
-            const remote = files.find(f => f.file_name === name && f.location === 'remote');
-            if (remote) { window._playAfterDl = name; await downloadFile(remote.file_id, remote.fromNodeId); }
-            else { playAudio(`/downloads/${name}`); }
-        }
-
+        // TRANSFERTS
+        async function downloadFile(id, from) { const bar = document.getElementById(`progress-${id}`); if (bar) bar.style.display = 'block'; await fetch('/api/download', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ fileId: id, fromNodeId: from })}); }
+        async function downloadFileByName(n) { const res = await fetch('/api/files'); const files = await res.json(); const f = files.find(f => f.file_name === n && f.location === 'remote'); if (f) downloadFile(f.file_id, f.fromNodeId); }
+        async function downloadAndPlay(n) { const res = await fetch('/api/files'); const files = await res.json(); const r = files.find(f => f.file_name === n && f.location === 'remote'); if (r) { window._playAfterDl = n; await downloadFile(r.file_id, r.fromNodeId); } else { playAudio(`/downloads/${n}`); } }
         function playAudio(url) { new Audio(url).play().catch(() => {}); }
+        async function manualConnect() { const ip = document.getElementById('manualIp').value; if (ip) { await fetch('/api/connect', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ip }) }); setTimeout(() => { fetchPeers(); fetchFiles(); }, 1500); } }
 
-        async function manualConnect() {
-            const ip = document.getElementById('manualIp').value;
-            if (ip) {
-                await fetch('/api/connect', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ip }) });
-                alert("Requête de connexion envoyée.");
-                setTimeout(() => { fetchPeers(); fetchFiles(); }, 1500);
-            }
-        }
-
-        // --- SOCKETS ---
+        // SOCKETS
         socket.on('new_message', msg => {
             if (msg.from === currentPeer || msg.to === currentPeer || msg.to === 'TOUT LE MONDE') {
                 loadMessages();
-                if (msg.from !== 'MOI' && msg.message.includes('🎤 Message vocal :')) {
-                    const fileName = msg.message.split(': ')[1];
-                    window._playAfterDl = fileName; downloadAndPlay(fileName);
-                }
-                // Auto-DL Photos
-                if (msg.from !== 'MOI' && msg.message.includes('🖼️ Photo reçue :')) {
-                    const fileName = msg.message.split(': ')[1];
-                    downloadFileByName(fileName);
-                }
+                if (msg.from !== 'MOI' && msg.message.includes('🎤 Message vocal :')) { window._playAfterDl = msg.message.split(': ')[1]; downloadAndPlay(window._playAfterDl); }
+                if (msg.from !== 'MOI' && msg.message.includes('🖼️ Photo reçue :')) { downloadFileByName(msg.message.split(': ')[1]); }
             }
         });
-
-        socket.on('download_complete', data => {
-            if (window._playAfterDl === data.fileName) { playAudio(`/downloads/${data.fileName}`); window._playAfterDl = null; }
-            fetchFiles();
-            loadMessages(); // Re-render pour afficher l'image DL
-        });
-
-        socket.on('download_progress', data => {
-            const bar = document.getElementById(`progress-${data.fileId}`);
-            if (bar) { bar.style.display='block'; bar.style.width = `${(data.downloaded/data.total)*100}%`; }
-        });
-
+        socket.on('download_complete', data => { if (window._playAfterDl === data.fileName) { playAudio(`/downloads/${data.fileName}`); window._playAfterDl = null; } fetchFiles(); loadMessages(); });
+        socket.on('download_progress', data => { const bar = document.getElementById(`progress-${data.fileId}`); if (bar) { bar.style.display='block'; bar.style.width = `${(data.downloaded/data.total)*100}%`; } });
         socket.on('new_peer', () => { fetchPeers(); fetchFiles(); });
 
-        // --- MAP ---
-        function toggleMap() {
-            const el = document.getElementById('mapOverlay');
-            el.style.display = el.style.display === 'none' ? 'block' : 'none';
-            if (el.style.display === 'block') drawMap();
-        }
-
+        function toggleMap() { const el = document.getElementById('mapOverlay'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; if (el.style.display === 'block') drawMap(); }
         function drawMap() {
-            const canvas = document.getElementById('mapCanvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const cx = canvas.width/2; const cy = canvas.height/2;
-            ctx.fillStyle = "#00d4ff"; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = "white"; ctx.fillText("MOI", cx-10, cy+30);
-            allPeers.forEach((p, i) => {
-                const ang = (i/allPeers.length)*Math.PI*2;
-                const x = cx + Math.cos(ang)*180; const y = cy + Math.sin(ang)*180;
-                ctx.strokeStyle = "rgba(0,212,255,0.3)"; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke();
-                ctx.fillStyle = getPeerColor(p.nodeId); ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2); ctx.fill();
-            });
+            const c = document.getElementById('mapCanvas'); const ctx = c.getContext('2d'); c.width = c.parentElement.clientWidth; c.height = c.parentElement.clientHeight; ctx.clearRect(0, 0, c.width, c.height);
+            const cx = c.width/2, cy = c.height/2; ctx.fillStyle = "#00d4ff"; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = "white"; ctx.fillText("MOI", cx-10, cy+30);
+            allPeers.forEach((p, i) => { const a = (i/allPeers.length)*Math.PI*2; const x = cx + Math.cos(a)*180, y = cy + Math.sin(a)*180; ctx.strokeStyle = "rgba(0,212,255,0.3)"; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(x, y); ctx.stroke(); ctx.fillStyle = getPeerColor(p.nodeId); ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI*2); ctx.fill(); });
         }
 
-        // --- INIT ---
         fetchStatus(); fetchPeers(); fetchFiles();
         setInterval(() => { fetchPeers(); fetchFiles(); }, 5000);
-        sendBtn.onclick = sendMessage;
-        messageInput.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
+        sendBtn.onclick = sendMessage; messageInput.onkeypress = (e) => { if(e.key === 'Enter') sendMessage(); };
     </script>
 </body>
 </html>
