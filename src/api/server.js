@@ -136,7 +136,8 @@ async function startArchipelEngine() {
             downloadFile(tcpServer, fromNodeId, file, identity.nodeId, (downloaded, total) => {
                 io.emit('download_progress', { fileId, downloaded, total });
             }).then(downloadPath => {
-                io.emit('download_complete', { fileId, path: downloadPath });
+                const fileName = path.basename(downloadPath);
+                io.emit('download_complete', { fileId, path: downloadPath, fileName });
             });
 
             res.json({ success: true, message: "Téléchargement lancé" });

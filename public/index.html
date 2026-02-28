@@ -666,12 +666,28 @@
             const progress = document.getElementById(`progress-${data.fileId}`);
             if (progress) progress.style.background = '#4ade80';
             
+            const fileName = data.fileName;
+            const fileUrl = `/downloads/${encodeURIComponent(fileName)}`;
+
             // Si c'était un vocal qu'on attendait de jouer
-            if (window._playAfterDl) {
-                playAudio(`/downloads/${window._playAfterDl}`);
+            if (window._playAfterDl === fileName) {
+                playAudio(fileUrl);
                 window._playAfterDl = null;
             } else {
-                alert(`✅ Téléchargement terminé !\nFichier enregistré dans : ${data.path}`);
+                // MISSION : Proposer l'ouverture ou la sauvegarde locale sur le PC
+                const action = confirm(`✅ "${fileName}" reçu !\n\nVoulez-vous l'OUVRIR dans le navigateur ?\n(Sinon il sera juste enregistré)`);
+                
+                if (action) {
+                    window.open(fileUrl, '_blank');
+                } else {
+                    // Force le téléchargement navigateur (déclenche "Enregistrer sous")
+                    const a = document.createElement('a');
+                    a.href = fileUrl;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
             }
             fetchFiles();
         });
