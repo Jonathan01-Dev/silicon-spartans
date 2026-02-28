@@ -14,6 +14,7 @@ import { loadOrCreateIdentity } from '../crypto/identity.js';
 import { PeerDiscovery } from '../network/peer-discovery.js';
 import { TcpServer } from '../network/tcp-server.js';
 import { Messenger } from '../messaging/messenger.js';
+import { GeminiAssistant } from '../messaging/gemini.js';
 import { peerTable } from '../network/peer-table.js';
 import { initDatabase, getHistory } from '../database/db.js';
 import { listAllFiles, indexSharedFiles } from '../transfer/file-index.js';
@@ -24,6 +25,10 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server);
 const WEB_PORT = 3000;
+
+// Configuration Gemini
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;
+const gemini = new GeminiAssistant(GEMINI_API_KEY);
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../../public')));
@@ -84,6 +89,20 @@ async function startArchipelEngine() {
         // Force l'indexation au besoin
         indexSharedFiles();
         res.json(listAllFiles());
+    });
+
+    // Mission : IA Assistant Gemini
+    app.post('/api/ai/ask', async (req, res) => {
+        const { question } = req.body;
+        if (!question) return res.status(400).json({ error: "Question requise" });
+
+        try {
+            const context = messenger.getGeminiContext(15);
+            const answer = await gemini.ask(question, context);
+            res.json({ success: true, answer });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     });
 
     // Mission : Connexion manuelle (Roue de secours si Multicast bloqué)

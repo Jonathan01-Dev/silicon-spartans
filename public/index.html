@@ -265,6 +265,7 @@
                 <div id="encryptStatus" style="font-size:11px; color:var(--accent)">MODE P2P SÉCURISÉ</div>
             </div>
             <div style="display:flex; gap:10px">
+                <button onclick="askAI()" class="action-btn" title="Assistant IA" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:#ff007a; border-color:#ff007a">🤖 IA GEMINI</button>
                 <button onclick="toggleBroadcastMode()" id="broadcastToggle" class="action-btn" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:#ffb800; border-color:#ffb800">📢 TOUT LE MONDE</button>
                 <button onclick="toggleMap()" class="action-btn" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:var(--accent)">🕸️ TOPOLOGIE</button>
             </div>
@@ -375,6 +376,37 @@
                     </div>
                 </div>`;
             }).join('');
+        }
+
+        async function askAI() {
+            const question = prompt("🤖 Assistant Gemini ARCHIPEL\n\nPosez votre question (ex: 'Qui est connecté ?', 'Comment sécuriser mon nœud ?') :");
+            if (!question) return;
+
+            const chatMessagesEl = document.getElementById('chatMessages');
+            const thinkingMsg = document.createElement('div');
+            thinkingMsg.className = 'message received';
+            thinkingMsg.style.borderColor = '#ff007a';
+            thinkingMsg.innerHTML = `<b>🤖 Assistant IA</b><br>🤔 Réflexion en cours...`;
+            chatMessagesEl.appendChild(thinkingMsg);
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+
+            try {
+                const res = await fetch('/api/ai/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    thinkingMsg.innerHTML = `<b>🤖 Assistant IA</b><br>${data.answer.replace(/\n/g, '<br>')}`;
+                } else {
+                    thinkingMsg.innerHTML = `<b>🤖 Assistant IA</b><br>❌ ${data.error}`;
+                }
+            } catch (e) {
+                thinkingMsg.innerHTML = `<b>🤖 Assistant IA</b><br>❌ Erreur de connexion API Gemini.`;
+            }
+            chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
         }
 
         async function selectPeer(nodeId) {
