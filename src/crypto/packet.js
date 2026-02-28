@@ -35,7 +35,8 @@ export const PacketTypeName = {
 };
 
 // Clé HMAC "publique" pour les paquets de découverte (HELLO)
-export const PUBLIC_HMAC_KEY = Buffer.alloc(32, 0x41).toString('hex');
+// Doit être strictement identique sur tous les nœuds
+export const PUBLIC_HMAC_KEY = "archipel_discovery_key_2024_v1_secure";
 
 const HMAC_SIZE = 32;
 
@@ -43,7 +44,13 @@ const HMAC_SIZE = 32;
  * Calcule le HMAC-SHA256 d'un buffer avec une clé hex
  */
 function hmac(data, keyHex) {
-    return createHmac('sha256', Buffer.from(keyHex, 'hex')).update(data).digest();
+    try {
+        const key = keyHex.length === 64 ? Buffer.from(keyHex, 'hex') : Buffer.from(keyHex);
+        return createHmac('sha256', key).update(data).digest();
+    } catch (e) {
+        // Fallback pour éviter le crash
+        return Buffer.alloc(32, 0);
+    }
 }
 
 /**

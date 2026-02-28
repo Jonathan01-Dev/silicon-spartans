@@ -1,6 +1,6 @@
 /**
  * ARCHIPEL — Serveur TCP (Port 7777) — Version complète Sprint 2+3
- * Gère : MSG, PEER_LIST, ACK, HANDSHAKE, MANIFEST, CHUNK_REQ, CHUNK_DATA
+ * Gère : MSG, PEER_LIST, ACK, HANDSHAKE, MANIFEST, CHUNK_REQ, CHUNK_DATA, HELLO, RELAY
  */
 
 import net from 'net';
@@ -70,7 +70,9 @@ export class TcpServer {
 
                 const hmacKey = this._getHmacKey(packetBuf);
                 const packet = parsePacket(packetBuf, hmacKey);
-                if (packet) this._handlePacket(packet, socket);
+                if (packet) this._handlePacket(packet, socket).catch(err => {
+                    console.error('[TCP] ❌ Erreur handling packet:', err.message);
+                });
             }
         });
 
@@ -95,178 +97,182 @@ export class TcpServer {
 
     /* ── Dispatch des paquets reçus ─────────────────────────────────── */
     async _handlePacket(packet, socket) {
-        const data = parseJsonPayload(packet);
+        try {
+            const data = parseJsonPayload(packet);
+            if (!data && packet.type !== PacketType.ACK) return;
 
-        switch (packet.type) {
+            switch (packet.type) {
 
-            /* ── HELLO (Découverte via TCP) ────────────────────────────── */
-            case PacketType.HELLO: {
-                if (!data) return;
-                const peerInfo = {
-                    nodeId: data.nodeId,
-                    ip: socket.remoteAddress?.replace('::ffff:', ''),
-                    tcpPort: data.tcpPort,
-                    dhPublicKey: data.dhPublicKey,
-                    signingPublicKey: data.signingPublicKey,
-                    sharedFiles: data.sharedFiles || [],
-                };
-                peerTable.upsert(peerInfo);
-                this.connections.set(data.nodeId, socket);
-                this.onPeerDiscovered(peerInfo);
-                console.log(`[TCP] ✨ Pair découvert via TCP: ${data.nodeId.slice(0, 12)}…`);
-                break;
-            }
+                /* ── HELLO (Découverte via TCP) ────────────────────────────── */
+                case PacketType.HELLO: {
+                    const peerInfo = {
+                        nodeId: data.nodeId,
+                        ip: socket.remoteAddress?.replace('::ffff:', ''),
+                        tcpPort: data.tcpPort,
+                        dhPublicKey: data.dhPublicKey,
+                        signingPublicKey: data.signingPublicKey,
+                        sharedFiles: data.sharedFiles || [],
+                    };
+                    peerTable.upsert(peerInfo);
+                    this.connections.set(data.nodeId, socket);
+                    this.onPeerDiscovered(peerInfo);
+                    console.log(`[TCP] ✨ Pair découvert via TCP: ${data.nodeId.slice(0, 12)}…`);
+                    break;
+                }
 
-            /* ── MSG (chat + handshake) ────────────────────────────────── */
-            case PacketType.MSG: {
-                if (!data) return;
+                /* ── MSG (chat + handshake) ────────────────────────────────── */
+                case PacketType.MSG: {
+                    // Handshake INIT
+                    if (data.type === 'HANDSHAKE_INIT') {
+                        const trust = checkTrust(data.nodeId, data.signingPub, data.dhPub);
+                        if (!trust.trusted) {
+                            console.warn(`[TCP] 🚨 Pair non fiable refusé: ${data.nodeId.slice(0, 12)}…`);
+                            return;
+                        }
+                        const { responsePacket, sessionKey } = respondHandshake(data, this.identity);
+                        peerTable.setSessionKey(data.nodeId, sessionKey);
+                        socket.write(responsePacket);
+                        this.connections.set(data.nodeId, socket);
+                        console.log(`[TCP] 🤝 Handshake terminé avec ${data.nodeId.slice(0, 12)}…`);
 
-                // Handshake INIT
-                if (data.type === 'HANDSHAKE_INIT') {
-                    const trust = checkTrust(data.nodeId, data.signingPub, data.dhPub);
-                    if (!trust.trusted) {
-                        console.warn(`[TCP] 🚨 Pair non fiable refusé: ${data.nodeId.slice(0, 12)}…`);
+                        // Vérifier s'il y a des messages en attente de relais pour ce pair
+                        this._deliverRelayMessages(data.nodeId, socket);
                         return;
                     }
-                    const { responsePacket, sessionKey } = respondHandshake(data, this.identity);
-                    peerTable.setSessionKey(data.nodeId, sessionKey);
-                    socket.write(responsePacket);
-                    this.connections.set(data.nodeId, socket);
-                    console.log(`[TCP] 🤝 Handshake terminé avec ${data.nodeId.slice(0, 12)}…`);
 
-                    // Vérifier s'il y a des messages en attente de relais pour ce pair
-                    this._deliverRelayMessages(data.nodeId, socket);
-                    return;
-                }
+                    // Handshake RESP
+                    if (data.type === 'HANDSHAKE_RESP') {
+                        checkTrust(data.nodeId, data.signingPub, data.dhPub);
+                        this.connections.set(data.nodeId, socket);
+                        // La finalisation de la clé est faite côté Messenger
+                        this._pendingHandshakeResp = data;
 
-                // Handshake RESP
-                if (data.type === 'HANDSHAKE_RESP') {
-                    checkTrust(data.nodeId, data.signingPub, data.dhPub);
-                    this.connections.set(data.nodeId, socket);
-                    // La finalisation de la clé est faite côté Messenger
-                    this._pendingHandshakeResp = data;
-
-                    // Délivrer les messages en attente
-                    this._deliverRelayMessages(data.nodeId, socket);
-                    return;
-                }
-
-                // Message chat normal
-                const peer = peerTable.get(packet.nodeId);
-                let text = data.ciphertext;
-                if (peer?.sessionKey && data.nonce) {
-                    text = decryptMessage(data.ciphertext, data.nonce, peer.sessionKey) ?? data.ciphertext;
-                }
-
-                // Vérification de la signature
-                if (data.signature && peer?.signingPublicKey) {
-                    const isValid = verifySignature(text, data.signature, peer.signingPublicKey);
-                    if (!isValid) {
-                        console.warn(`[TCP] 🚨 Signature invalide de ${packet.nodeId.slice(0, 12)}… !`);
-                        text = `⚠️ [NON SIGNÉ/FALSIFIÉ] ${text}`;
+                        // Délivrer les messages en attente
+                        this._deliverRelayMessages(data.nodeId, socket);
+                        return;
                     }
-                }
 
-                this.connections.set(packet.nodeId, socket);
-                this.onMessageReceived({ from: packet.nodeId, message: text, timestamp: data.timestamp || Date.now(), encrypted: !!peer?.sessionKey });
-                break;
-            }
+                    // Message chat normal
+                    const peer = peerTable.get(packet.nodeId);
+                    let text = data.ciphertext;
+                    if (peer?.sessionKey && data.nonce) {
+                        text = decryptMessage(data.ciphertext, data.nonce, peer.sessionKey) ?? data.ciphertext;
+                    }
 
-            /* ── PEER_LIST ─────────────────────────────────────────────── */
-            case PacketType.PEER_LIST: {
-                if (!data?.peers) return;
-                for (const p of data.peers) {
-                    if (p.nodeId !== this.identity.nodeId) peerTable.upsert(p);
-                }
-                console.log(`[TCP] 📋 PEER_LIST: ${data.peers.length} pairs`);
-                break;
-            }
+                    // Vérification de la signature
+                    if (data.signature && peer?.signingPublicKey) {
+                        const isValid = verifySignature(text, data.signature, peer.signingPublicKey);
+                        if (!isValid) {
+                            console.warn(`[TCP] 🚨 Signature invalide de ${packet.nodeId.slice(0, 12)}… !`);
+                            text = `⚠️ [NON SIGNÉ/FALSIFIÉ] ${text}`;
+                        }
+                    }
 
-            /* ── MANIFEST reçu ─────────────────────────────────────────── */
-            case PacketType.MANIFEST: {
-                if (!data?.manifest) return;
-                const { saveRemoteManifest } = await import('../transfer/file-index.js');
-                saveRemoteManifest(data.manifest, packet.nodeId);
-                console.log(`[TCP] 📦 Manifest reçu: ${data.manifest.file_name}`);
-                this.onMessageReceived({
-                    from: packet.nodeId,
-                    message: `📦 Fichier disponible: ${data.manifest.file_name} (${(data.manifest.file_size / 1024 / 1024).toFixed(2)} MB) — tapez download ${data.manifest.file_id.slice(0, 8)} pour télécharger`,
-                    timestamp: Date.now(),
-                    encrypted: false,
-                });
-                break;
-            }
-
-            /* ── CHUNK_REQ : un pair demande un chunk ──────────────────── */
-            case PacketType.CHUNK_REQ: {
-                if (!data) return;
-                const manifest = getLocalManifest(data.file_id);
-                if (!manifest) return;
-
-                try {
-                    const chunkData = readChunk(manifest.path, data.chunk_index);
-                    const chunkInfo = manifest.chunks[data.chunk_index];
-                    const payload = JSON.stringify({
-                        type: 'CHUNK_DATA',
-                        file_id: data.file_id,
-                        chunk_index: data.chunk_index,
-                        hash: chunkInfo.hash,
-                        data: chunkData.toString('base64'),
-                    });
-                    const resp = buildPacket(PacketType.CHUNK_DATA, this.identity.nodeId, payload, PUBLIC_HMAC_KEY);
-                    socket.write(resp);
-                } catch (err) {
-                    console.error('[TCP] ❌ Erreur lecture chunk:', err.message);
-                }
-                break;
-            }
-
-            /* ── CHUNK_DATA reçu ───────────────────────────────────────── */
-            case PacketType.CHUNK_DATA: {
-                if (!data) return;
-                this.onChunkReceived(data);
-                break;
-            }
-
-            /* ── RELAY reçu : on transporte ou on reçoit ? ────────────── */
-            case PacketType.RELAY: {
-                if (!data) return;
-
-                // Si le message est pour NOUS
-                if (data.target === this.identity.nodeId) {
-                    console.log(`[TCP] 📨 Message RELAY reçu de ${data.sender.slice(0, 12)}…`);
+                    this.connections.set(packet.nodeId, socket);
                     this.onMessageReceived({
-                        from: data.sender,
-                        message: `[Relay] ${data.content}`,
+                        from: packet.nodeId,
+                        message: text,
                         timestamp: data.timestamp || Date.now(),
-                        encrypted: false
+                        encrypted: !!peer?.sessionKey
                     });
-                } else {
-                    // Sinon, on le stocke pour le redonner plus tard (on devient relayeur)
-                    console.log(`[TCP] 🔄 On accepte de relayer un message pour ${data.target.slice(0, 12)}…`);
-                    queueRelayMessage(data.target, data.sender, data);
+                    break;
                 }
-                break;
+
+                /* ── PEER_LIST ─────────────────────────────────────────────── */
+                case PacketType.PEER_LIST: {
+                    if (!data?.peers) return;
+                    for (const p of data.peers) {
+                        if (p.nodeId !== this.identity.nodeId) peerTable.upsert(p);
+                    }
+                    console.log(`[TCP] 📋 PEER_LIST: ${data.peers.length} pairs`);
+                    break;
+                }
+
+                /* ── MANIFEST reçu ─────────────────────────────────────────── */
+                case PacketType.MANIFEST: {
+                    if (!data?.manifest) return;
+                    const { saveRemoteManifest } = await import('../transfer/file-index.js');
+                    saveRemoteManifest(data.manifest, packet.nodeId);
+                    console.log(`[TCP] 📦 Manifest reçu: ${data.manifest.file_name}`);
+                    this.onMessageReceived({
+                        from: packet.nodeId,
+                        message: `📦 Fichier disponnible: ${data.manifest.file_name} (${(data.manifest.file_size / 1024 / 1024).toFixed(2)} MB)`,
+                        timestamp: Date.now(),
+                        encrypted: false,
+                    });
+                    break;
+                }
+
+                /* ── CHUNK_REQ : un pair demande un chunk ──────────────────── */
+                case PacketType.CHUNK_REQ: {
+                    const manifest = getLocalManifest(data.file_id);
+                    if (!manifest) return;
+
+                    try {
+                        const chunkData = readChunk(manifest.path, data.chunk_index);
+                        const chunkInfo = manifest.chunks[data.chunk_index];
+                        const payload = JSON.stringify({
+                            type: 'CHUNK_DATA',
+                            file_id: data.file_id,
+                            chunk_index: data.chunk_index,
+                            hash: chunkInfo.hash,
+                            data: chunkData.toString('base64'),
+                        });
+                        const resp = buildPacket(PacketType.CHUNK_DATA, this.identity.nodeId, payload, PUBLIC_HMAC_KEY);
+                        socket.write(resp);
+                    } catch (err) {
+                        console.error('[TCP] ❌ Erreur lecture chunk:', err.message);
+                    }
+                    break;
+                }
+
+                case PacketType.CHUNK_DATA:
+                    this.onChunkReceived(data);
+                    break;
+
+                /* ── RELAY reçu : on transporte ou on reçoit ? ────────────── */
+                case PacketType.RELAY: {
+                    if (!data || !data.target) return;
+
+                    if (data.target === this.identity.nodeId) {
+                        console.log(`[TCP] 📨 Message RELAY reçu de ${data.sender?.slice(0, 12) || 'Inconnu'}…`);
+                        this.onMessageReceived({
+                            from: data.sender || 'Inconnu',
+                            message: `[Relay] ${data.content}`,
+                            timestamp: data.timestamp || Date.now(),
+                            encrypted: false
+                        });
+                    } else {
+                        console.log(`[TCP] 🔄 On accepte de relayer un message pour ${data.target.slice(0, 12)}…`);
+                        queueRelayMessage(data.target, data.sender, data);
+                    }
+                    break;
+                }
+
+                case PacketType.ACK:
+                    break;
+
+                default:
+                    console.log(`[TCP] Paquet inconnu: ${PacketTypeName[packet.type] || packet.type}`);
             }
-
-            /* ── ACK ───────────────────────────────────────────────────── */
-            case PacketType.ACK:
-                break;
-
-            default:
-                console.log(`[TCP] Paquet inconnu: ${PacketTypeName[packet.type] || packet.type}`);
+        } catch (err) {
+            console.error('[TCP] 🚨 Crash évité dans _handlePacket:', err.message);
         }
     }
 
     /* ── Délivre les messages stockés pour un pair ─────────────────── */
     _deliverRelayMessages(nodeId, socket) {
-        const messages = fetchRelayMessages(nodeId);
-        if (messages.length > 0) {
-            console.log(`[TCP] 📤 Délivrance de ${messages.length} message(s) en attente pour ${nodeId.slice(0, 12)}…`);
-            for (const msg of messages) {
-                const packet = buildPacket(PacketType.RELAY, this.identity.nodeId, JSON.stringify(msg.packet_data), PUBLIC_HMAC_KEY);
-                socket.write(packet);
+        try {
+            const messages = fetchRelayMessages(nodeId);
+            if (messages.length > 0) {
+                console.log(`[TCP] 📤 Délivrance de ${messages.length} message(s) en attente pour ${nodeId.slice(0, 12)}…`);
+                for (const msg of messages) {
+                    const packet = buildPacket(PacketType.RELAY, this.identity.nodeId, JSON.stringify(msg.packet_data), PUBLIC_HMAC_KEY);
+                    socket.write(packet);
+                }
             }
+        } catch (err) {
+            console.error('[TCP] ❌ Erreur délivrance relais:', err.message);
         }
     }
 
@@ -288,36 +294,42 @@ export class TcpServer {
     /* ── Nouvelle méthode : Force la connexion via IP (Découverte manuelle) ─── */
     async sendToIP(ip, port) {
         return new Promise((resolve, reject) => {
+            console.log(`[TCP] 🔗 Connexion directe vers ${ip}:${port}...`);
             const socket = net.createConnection({ host: ip, port }, () => {
                 socket.setKeepAlive(true, KEEPALIVE_INTERVAL);
 
                 // On lui envoie notre HELLO pour qu'il nous découvre
                 const hello = buildHelloPacket(this.identity, this._port, getLocalManifest());
-
                 socket.write(hello);
+
                 this._handleConnection(socket);
                 resolve(socket);
             });
-            socket.on('error', reject);
-            setTimeout(() => reject(new Error('Timeout connexion IP')), 5000);
+            socket.on('error', (err) => {
+                console.error(`[TCP] ❌ Échec connexion vers ${ip}:${port}`);
+                reject(err);
+            });
+            setTimeout(() => {
+                socket.destroy();
+                reject(new Error('Timeout connexion IP'));
+            }, 5000);
         });
     }
 
-    /* ── Connexion sortante ─────────────────────────────────────────── */
     _connect(ip, port, nodeId) {
         return new Promise((resolve, reject) => {
             const socket = net.createConnection({ host: ip, port }, () => {
                 socket.setKeepAlive(true, KEEPALIVE_INTERVAL);
                 this.connections.set(nodeId, socket);
                 this._handleConnection(socket);
-
-                // Délivrer les messages en attente de relais
                 this._deliverRelayMessages(nodeId, socket);
-
                 resolve(socket);
             });
             socket.on('error', reject);
-            setTimeout(() => reject(new Error('Timeout connexion TCP')), 5000);
+            setTimeout(() => {
+                socket.destroy();
+                reject(new Error('Timeout connexion TCP'));
+            }, 5000);
         });
     }
 

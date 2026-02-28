@@ -4,9 +4,11 @@
  */
 
 import express from 'express';
+import multer from 'multer';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { loadOrCreateIdentity } from '../crypto/identity.js';
 import { PeerDiscovery } from '../network/peer-discovery.js';
@@ -72,6 +74,8 @@ async function startArchipelEngine() {
     });
 
     app.get('/api/files', (req, res) => {
+        // Force l'indexation au besoin
+        indexSharedFiles();
         res.json(listAllFiles());
     });
 
@@ -134,6 +138,61 @@ async function startArchipelEngine() {
             });
 
             res.json({ success: true, message: "Téléchargement lancé" });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    // Configuration Multer pour les fichiers reçus du navigateur
+    const upload = multer({ dest: 'shared/' });
+
+    app.post('/api/upload', upload.single('file'), async (req, res) => {
+        const { targetNodeId } = req.body;
+        if (!req.file || !targetNodeId) return res.status(400).json({ error: "Fichier et destinataire requis" });
+
+        try {
+            // Renommer le fichier avec son nom d'origine dans shared/
+            const finalPath = path.join('shared', req.file.originalname);
+            fs.renameSync(req.file.path, finalPath);
+
+            // Indexation immédiate
+            indexSharedFiles();
+            const manifest = listAllFiles().find(f => f.file_name === req.file.originalname && f.location === 'local');
+
+            if (manifest) {
+                // Notifie le destinataire via TCP (Mission : P2P)
+                const { sendManifest } = await import('../transfer/transfer.js');
+                await sendManifest(tcpServer, targetNodeId, manifest.file_id);
+            }
+
+            res.json({ success: true, fileName: req.file.originalname });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
+    app.post('/api/voice', async (req, res) => {
+        const { targetNodeId, audioData } = req.body;
+        if (!audioData || !targetNodeId) return res.status(400).json({ error: "Audio requis" });
+
+        try {
+            const fileName = `VOICE_${Date.now()}.webm`;
+            const finalPath = path.join('shared', fileName);
+            fs.writeFileSync(finalPath, Buffer.from(audioData, 'base64'));
+
+            indexSharedFiles();
+            const manifest = listAllFiles().find(f => f.file_name === fileName);
+
+            if (manifest) {
+                const { sendManifest } = await import('../transfer/transfer.js');
+                await sendManifest(tcpServer, targetNodeId, manifest.file_id);
+
+                // On envoie aussi un petit message texte pour prévenir
+                await messenger.send(targetNodeId, `🎤 Message vocal émis (${fileName})`);
+                io.emit('new_message', { from: 'MOI', to: targetNodeId, message: `🎤 Message vocal : ${fileName}`, timestamp: Date.now() });
+            }
+
+            res.json({ success: true });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }

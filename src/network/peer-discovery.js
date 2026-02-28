@@ -93,12 +93,12 @@ export class PeerDiscovery {
 
         if (packet.type === PacketType.HELLO) {
             const data = parseJsonPayload(packet);
-            if (!data) return;
+            if (!data || !data.nodeId) return;
 
             const peerInfo = {
                 nodeId: data.nodeId,
-                ip: rinfo.address,
-                tcpPort: data.tcpPort,
+                ip: rinfo.address.replace('::ffff:', ''),
+                tcpPort: data.tcpPort || 7777,
                 dhPublicKey: data.dhPublicKey,
                 signingPublicKey: data.signingPublicKey,
                 sharedFiles: data.sharedFiles || [],
