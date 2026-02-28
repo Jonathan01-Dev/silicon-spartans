@@ -401,14 +401,22 @@
                 fileListEl.innerHTML = '<div style="opacity:0.3; font-size:11px; text-align:center">Aucun fichier...</div>';
                 return;
             }
-            fileListEl.innerHTML = files.map(f => `
+            fileListEl.innerHTML = files.map(f => {
+                const isLocal = f.location === 'local';
+                const url = isLocal ? `/shared/${encodeURIComponent(f.file_name)}` : `/downloads/${encodeURIComponent(f.file_name)}`;
+                
+                return `
                 <div class="peer-item" style="cursor:default">
                     <div class="peer-name">📄 ${f.file_name}</div>
-                    <div class="peer-status">${(f.file_size / 1024).toFixed(1)} KB | ${f.location === 'local' ? '✅ Partagé' : '☁️ Distant'}</div>
-                    ${f.location === 'remote' ? `<button onclick="downloadFile('${f.file_id}', '${f.fromNodeId}')" style="width:100%; height:25px; border-radius:5px; font-size:10px; margin-top:5px">Télécharger</button>` : ''}
+                    <div class="peer-status">${(f.file_size / 1024).toFixed(1)} KB | ${isLocal ? '✅ Partagé' : '☁️ Distant'}</div>
+                    <div style="display:flex; gap:5px; margin-top:5px">
+                        ${f.location === 'remote' ? `<button onclick="downloadFile('${f.file_id}', '${f.fromNodeId}')" style="flex:1; height:25px; border-radius:5px; font-size:10px">Télécharger</button>` : ''}
+                        <button onclick="window.open('${url}', '_blank')" style="flex:1; height:25px; border-radius:5px; font-size:10px; background:var(--glass); border:1px solid var(--border); color:var(--accent)">Ouvrir</button>
+                    </div>
                     <div id="progress-${f.file_id}" style="height:4px; background:var(--accent); width:0%; margin-top:5px; transition:width 0.3s; display:none"></div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
         }
 
         async function downloadFile(fileId, fromNodeId) {
