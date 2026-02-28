@@ -526,7 +526,12 @@
 
         async function manualConnect() {
             const ip = document.getElementById('manualIp').value;
-            if (ip) await fetch('/api/connect', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ip }) });
+            if (ip) {
+                await fetch('/api/connect', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ip }) });
+                alert("Requête de connexion envoyée à " + ip);
+                // On force le rafraîchissement après un court délai pour laisser le temps au HELLO
+                setTimeout(() => { fetchPeers(); fetchFiles(); }, 1500);
+            }
         }
 
         // --- SOCKETS ---

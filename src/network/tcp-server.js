@@ -180,6 +180,9 @@ export class TcpServer {
 
                     // Message chat normal (Mode Simplifié Hackathon)
                     const peer = peerTable.get(packet.nodeId);
+                    if (!peer) {
+                        console.log(`[TCP] 📨 Message reçu de ${packet.nodeId.slice(0, 12)}… (Inconnu dans peerTable, mais traité)`);
+                    }
                     let text = data.ciphertext;
                     
                     // On tente de décrypter seulement si on a une session, sinon on prend le clair
@@ -322,11 +325,13 @@ export class TcpServer {
             const socket = net.createConnection({ host: ip, port }, () => {
                 socket.setKeepAlive(true, KEEPALIVE_INTERVAL);
 
-                // Import local pour éviter les cycles
+                // Envoi immédiat de notre HELLO pour se présenter
                 import('../transfer/file-index.js').then(({ getSharedFileSummaries }) => {
                     const summaries = getSharedFileSummaries();
                     const hello = buildHelloPacket(this.identity, this._port, summaries);
                     socket.write(hello);
+                    
+                    // On traite les données entrantes (le HELLO de l'autre PC)
                     this._handleConnection(socket);
                     resolve(socket);
                 });
