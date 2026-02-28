@@ -179,6 +179,27 @@ async function startArchipelEngine() {
         }
     });
 
+    app.post('/api/broadcast', async (req, res) => {
+        const { message } = req.body;
+        if (!message) return res.status(400).json({ error: "Message requis" });
+
+        try {
+            const results = await messenger.broadcast(message);
+            
+            // On signale dans l'UI locale
+            io.emit('new_message', {
+                from: 'MOI',
+                to: 'TOUT LE MONDE',
+                message: `📢 [BROADCAST] ${message}`,
+                timestamp: Date.now()
+            });
+
+            res.json({ success: true, results });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     app.post('/api/voice', async (req, res) => {
         const { targetNodeId, audioData } = req.body;
         if (!audioData || !targetNodeId) return res.status(400).json({ error: "Données audio ou destinataire manquants" });

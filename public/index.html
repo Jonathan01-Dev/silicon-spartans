@@ -264,7 +264,10 @@
                 <div id="activePeerName" style="font-weight:700; font-size:18px">Choisir un pair</div>
                 <div id="encryptStatus" style="font-size:11px; color:var(--accent)">MODE P2P SÉCURISÉ</div>
             </div>
-            <button onclick="toggleMap()" class="action-btn" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:var(--accent)">🕸️ TOPOLOGIE</button>
+            <div style="display:flex; gap:10px">
+                <button onclick="toggleBroadcastMode()" id="broadcastToggle" class="action-btn" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:#ffb800; border-color:#ffb800">📢 TOUT LE MONDE</button>
+                <button onclick="toggleMap()" class="action-btn" style="width:auto; padding:0 16px; font-size:11px; font-weight:800; color:var(--accent)">🕸️ TOPOLOGIE</button>
+            </div>
         </div>
 
         <div class="chat-messages" id="chatMessages"></div>
@@ -418,15 +421,44 @@
 
         // --- LOGIQUE CORE ---
 
+        let isBroadcastMode = false;
+
+        function toggleBroadcastMode() {
+            isBroadcastMode = !isBroadcastMode;
+            const btn = document.getElementById('broadcastToggle');
+            if (isBroadcastMode) {
+                btn.style.background = "#ffb800";
+                btn.style.color = "black";
+                activePeerName.innerText = "📢 DIFFUSION À TOUS LES NŒUDS";
+                currentPeer = null; // Désélectionne le pair individuel
+                renderPeers();
+            } else {
+                btn.style.background = "var(--glass)";
+                btn.style.color = "#ffb800";
+                activePeerName.innerText = "Choisir un pair";
+            }
+        }
+
         async function sendMessage() {
             const text = messageInput.value.trim();
-            if (!text || !currentPeer) return;
-            messageInput.value = '';
-            await fetch('/api/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nodeId: currentPeer, message: text })
-            });
+            if (!text) return;
+
+            if (isBroadcastMode) {
+                messageInput.value = '';
+                await fetch('/api/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+            } else {
+                if (!currentPeer) return alert("Choisissez un pair ou activez le mode TOUT LE MONDE");
+                messageInput.value = '';
+                await fetch('/api/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nodeId: currentPeer, message: text })
+                });
+            }
         }
 
         async function shareLocation() {

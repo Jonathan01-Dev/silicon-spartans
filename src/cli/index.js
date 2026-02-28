@@ -182,6 +182,19 @@ async function main() {
                 }
             }
 
+            // ── broadcast <message> ──────────────────────────────────────────────
+            else if (cmd === 'broadcast' || cmd === 'all') {
+                if (parts.length < 2) {
+                    console.log(chalk.yellow('Usage: broadcast <message>'));
+                } else {
+                    const message = parts.slice(1).join(' ');
+                    console.log(chalk.cyan(`📢 Envoi en broadcast à tous les pairs...`));
+                    const results = await messenger.broadcast(message);
+                    const successCount = results.filter(r => r.success).length;
+                    console.log(chalk.green(`✓ Envoyé avec succès à ${successCount}/${results.length} pair(s).`));
+                }
+            }
+
             // ── history ──────────────────────────────────────────────────────────
             else if (cmd === 'history') {
                 const hist = messenger.getHistory();

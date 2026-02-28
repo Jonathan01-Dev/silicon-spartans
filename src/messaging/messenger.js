@@ -97,6 +97,21 @@ export class Messenger {
         });
     }
 
+    /* ── Envoie un message à TOUS les pairs (Broadcast) ───────────── */
+    async broadcast(message) {
+        const peers = peerTable.getActivePeers();
+        const results = [];
+        for (const peer of peers) {
+            try {
+                await this.send(peer.nodeId, message);
+                results.push({ nodeId: peer.nodeId, success: true });
+            } catch (err) {
+                results.push({ nodeId: peer.nodeId, success: false, error: err.message });
+            }
+        }
+        return results;
+    }
+
     /* ── Message reçu ────────────────────────────────────────────────── */
     receive(msgInfo) {
         this._addToHistory({ from: msgInfo.from, to: 'MOI', message: msgInfo.message, encrypted: msgInfo.encrypted });
