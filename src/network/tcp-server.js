@@ -5,7 +5,7 @@
 
 import net from 'net';
 import {
-    parsePacket, buildPacket,
+    parsePacket, buildPacket, buildHelloPacket,
     PacketType, PacketTypeName,
     parseJsonPayload, PUBLIC_HMAC_KEY,
 } from '../crypto/packet.js';
@@ -21,9 +21,10 @@ const TCP_PORT = 7777;
 const KEEPALIVE_INTERVAL = 15_000;
 
 export class TcpServer {
-    constructor(identity, onMessageReceived) {
+    constructor(identity, onMessageReceived, onPeerDiscovered) {
         this.identity = identity;
         this.onMessageReceived = onMessageReceived || (() => { });
+        this.onPeerDiscovered = onPeerDiscovered || (() => { });
         this.onChunkReceived = () => { };
         this.server = null;
         this._port = TCP_PORT;
@@ -97,6 +98,24 @@ export class TcpServer {
         const data = parseJsonPayload(packet);
 
         switch (packet.type) {
+
+            /* ── HELLO (Découverte via TCP) ────────────────────────────── */
+            case PacketType.HELLO: {
+                if (!data) return;
+                const peerInfo = {
+                    nodeId: data.nodeId,
+                    ip: socket.remoteAddress?.replace('::ffff:', ''),
+                    tcpPort: data.tcpPort,
+                    dhPublicKey: data.dhPublicKey,
+                    signingPublicKey: data.signingPublicKey,
+                    sharedFiles: data.sharedFiles || [],
+                };
+                peerTable.upsert(peerInfo);
+                this.connections.set(data.nodeId, socket);
+                this.onPeerDiscovered(peerInfo);
+                console.log(`[TCP] ✨ Pair découvert via TCP: ${data.nodeId.slice(0, 12)}…`);
+                break;
+            }
 
             /* ── MSG (chat + handshake) ────────────────────────────────── */
             case PacketType.MSG: {
@@ -263,6 +282,24 @@ export class TcpServer {
 
         return new Promise((resolve, reject) => {
             socket.write(packetBuf, err => err ? reject(err) : resolve());
+        });
+    }
+
+    /* ── Nouvelle méthode : Force la connexion via IP (Découverte manuelle) ─── */
+    async sendToIP(ip, port) {
+        return new Promise((resolve, reject) => {
+            const socket = net.createConnection({ host: ip, port }, () => {
+                socket.setKeepAlive(true, KEEPALIVE_INTERVAL);
+
+                // On lui envoie notre HELLO pour qu'il nous découvre
+                const hello = buildHelloPacket(this.identity, this._port, getLocalManifest());
+
+                socket.write(hello);
+                this._handleConnection(socket);
+                resolve(socket);
+            });
+            socket.on('error', reject);
+            setTimeout(() => reject(new Error('Timeout connexion IP')), 5000);
         });
     }
 

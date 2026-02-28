@@ -39,6 +39,9 @@ async function startArchipelEngine() {
     const tcpServer = new TcpServer(identity, (msgInfo) => {
         // Envoi au frontend via Socket.io
         io.emit('new_message', msgInfo);
+    }, (peer) => {
+        // Découverte via TCP (mode manuel)
+        io.emit('new_peer', peer);
     });
 
     const tcpPort = await tcpServer.start();
@@ -70,6 +73,25 @@ async function startArchipelEngine() {
 
     app.get('/api/files', (req, res) => {
         res.json(listAllFiles());
+    });
+
+    // Mission : Connexion manuelle (Roue de secours si Multicast bloqué)
+    app.post('/api/connect', async (req, res) => {
+        const { ip, port } = req.body;
+        if (!ip) return res.status(400).json({ error: "IP requise" });
+
+        try {
+            // On envoie un paquet TCP à l'autre nœud pour se faire connaître
+            const targetPort = port || 7777;
+            console.log(`[API] 🔗 Tentative de connexion manuelle vers ${ip}:${targetPort}...`);
+
+            // On envoie un paquet vide pour déclencher la détection
+            await tcpServer.sendToIP(ip, targetPort);
+
+            res.json({ success: true, message: "Signal envoyé" });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
     });
 
     app.post('/api/send', async (req, res) => {
