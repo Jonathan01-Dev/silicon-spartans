@@ -181,27 +181,41 @@ async function startArchipelEngine() {
 
     app.post('/api/voice', async (req, res) => {
         const { targetNodeId, audioData } = req.body;
-        if (!audioData || !targetNodeId) return res.status(400).json({ error: "Audio requis" });
+        if (!audioData || !targetNodeId) return res.status(400).json({ error: "Données audio ou destinataire manquants" });
 
         try {
             const fileName = `VOICE_${Date.now()}.webm`;
             const finalPath = path.join('shared', fileName);
+            
+            // Écriture du fichier binaire
             fs.writeFileSync(finalPath, Buffer.from(audioData, 'base64'));
+            console.log(`[API] 🎤 Nouveau vocal créé: ${fileName}`);
 
+            // Indexation forcée pour que le fichier soit visible par les pairs
             indexSharedFiles();
-            const manifest = listAllFiles().find(f => f.file_name === fileName);
+            
+            const allFiles = listAllFiles();
+            const manifest = allFiles.find(f => f.file_name === fileName && f.location === 'local');
 
             if (manifest) {
+                // Notifie le destinataire via TCP
                 const { sendManifest } = await import('../transfer/transfer.js');
                 await sendManifest(tcpServer, targetNodeId, manifest.file_id);
 
-                // On envoie aussi un petit message texte pour prévenir (format détecté par l'UI)
-                await messenger.send(targetNodeId, `🎤 Message vocal : ${fileName}`);
-                io.emit('new_message', { from: 'MOI', to: targetNodeId, message: `🎤 Message vocal : ${fileName}`, timestamp: Date.now() });
+                // Envoi du message texte pour déclencher l'auto-lecture
+                const result = await messenger.send(targetNodeId, `🎤 Message vocal : ${fileName}`);
+                
+                io.emit('new_message', { 
+                    from: 'MOI', 
+                    to: targetNodeId, 
+                    message: `🎤 Message vocal : ${fileName}`, 
+                    timestamp: Date.now() 
+                });
             }
 
             res.json({ success: true });
         } catch (err) {
+            console.error(`[API] ❌ Erreur audio:`, err.message);
             res.status(500).json({ error: err.message });
         }
     });
