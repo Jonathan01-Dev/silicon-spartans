@@ -29,45 +29,21 @@ export class Messenger {
 
     /* ── Envoie un message à un pair ────────────────────────────────── */
     async send(nodeId, message) {
-        const peer = peerTable.get(nodeId);
-
-        // Si le pair n'est pas actif, on propose le mode RELAIS
-        if (!peer) {
-            console.log(`[MSG] ⚠️ Pair ${nodeId.slice(0, 12)}… déconnecté. Passage en mode RELAIS.`);
-            return this.sendRelay(nodeId, message);
-        }
-
         try {
-            // Établit la session si nécessaire
-            if (!peer.sessionKey) {
-                await this._doHandshake(nodeId);
-            }
-
-            const updatedPeer = peerTable.get(nodeId);
-            const sessionKey = updatedPeer?.sessionKey;
-            const hmacKey = sessionKey || PUBLIC_HMAC_KEY;
-
-            let payload;
-            if (sessionKey) {
-                const { ciphertext, nonce } = encryptMessage(message, sessionKey);
-                payload = JSON.stringify({ ciphertext, nonce, timestamp: Date.now() });
-            } else {
-                payload = JSON.stringify({ ciphertext: message, nonce: null, timestamp: Date.now() });
-            }
-
-            const packet = buildPacket(PacketType.MSG, this.identity.nodeId, payload, hmacKey);
-
-            // On signe le message clair pour prouver l'identité (Authenticité)
+            const hmacKey = PUBLIC_HMAC_KEY;
+            const payload = JSON.stringify({ ciphertext: message, nonce: null, timestamp: Date.now() });
+            
+            // Signature Ed25519 pour prouver l'identité
             const signature = signData(message, this.identity.signing.privateKey);
             const signedPayload = JSON.parse(payload);
             signedPayload.signature = signature;
+            signedPayload.nodeId = this.identity.nodeId; // Ajout explicite de l'ID émetteur
 
             const finalPacket = buildPacket(PacketType.MSG, this.identity.nodeId, JSON.stringify(signedPayload), hmacKey);
-
             await this.tcpServer.sendTo(nodeId, finalPacket);
 
-            this._addToHistory({ from: 'MOI', to: nodeId, message, encrypted: !!sessionKey });
-            return { encrypted: !!sessionKey, relayed: false };
+            this._addToHistory({ from: 'MOI', to: nodeId, message, encrypted: false });
+            return { encrypted: false, relayed: false };
         } catch (err) {
             console.warn(`[MSG] ❌ Échec envoi direct vers ${nodeId.slice(0, 12)}… (${err.message}). Passage en mode RELAIS.`);
             return this.sendRelay(nodeId, message);

@@ -174,20 +174,14 @@ export class TcpServer {
                         return;
                     }
 
-                    // Message chat normal
+                    // Message chat normal (Mode Simplifié Hackathon)
                     const peer = peerTable.get(packet.nodeId);
                     let text = data.ciphertext;
+                    
+                    // On tente de décrypter seulement si on a une session, sinon on prend le clair
                     if (peer?.sessionKey && data.nonce) {
-                        text = decryptMessage(data.ciphertext, data.nonce, peer.sessionKey) ?? data.ciphertext;
-                    }
-
-                    // Vérification de la signature
-                    if (data.signature && peer?.signingPublicKey) {
-                        const isValid = verifySignature(text, data.signature, peer.signingPublicKey);
-                        if (!isValid) {
-                            console.warn(`[TCP] 🚨 Signature invalide de ${packet.nodeId.slice(0, 12)}… !`);
-                            text = `⚠️ [NON SIGNÉ/FALSIFIÉ] ${text}`;
-                        }
+                        const decrypted = decryptMessage(data.ciphertext, data.nonce, peer.sessionKey);
+                        if (decrypted) text = decrypted;
                     }
 
                     this.connections.set(packet.nodeId, socket);
