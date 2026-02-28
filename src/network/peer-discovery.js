@@ -77,7 +77,7 @@ export class PeerDiscovery {
         const packet = buildHelloPacket(this.identity, this.tcpPort, sharedFiles);
         this.socket.send(packet, MULTICAST_PORT, MULTICAST_ADDR, (err) => {
             if (err) console.error('[DISCOVERY] ❌ Erreur envoi HELLO:', err.message);
-            else console.log('[DISCOVERY] 📡 HELLO envoyé');
+            // Log supprimé pour propreté CLI
         });
     }
 

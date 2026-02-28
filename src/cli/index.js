@@ -99,11 +99,10 @@ async function main() {
 
         const shortId = msgInfo.from.slice(0, 12);
         const lock = msgInfo.encrypted ? chalk.green('🔒') : chalk.red('🔓');
-        console.log(`\n${lock} ${chalk.cyan(`[${shortId}…]`)} ${msgInfo.message}`);
-        process.stdout.write(chalk.gray('archipel> '));
+        process.stdout.write(`\r${lock} ${chalk.cyan(`[${shortId}…]`)} ${msgInfo.message}\n`);
+        rl.prompt(true);
     }, async (peer) => {
-        console.log(`\n${chalk.green('🟢 Nouveau pair découvert !')} ${peer.ip}:${peer.tcpPort}`);
-        process.stdout.write(chalk.gray('archipel> '));
+        // Silencieux pour ne pas couper la frappe de l'utilisateur
     });
 
     const tcpPort = await tcpServer.start();

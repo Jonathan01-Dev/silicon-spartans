@@ -93,8 +93,7 @@ export function parsePacket(buf, hmacKeyHex) {
 
     // Vérification HMAC en temps constant (protection timing attack)
     if (!timingSafeEqual(receivedMac, expectedMac)) {
-        // MISSION : Tolérance maximale pour le Hackathon (On laisse tout passer)
-        console.log(`[ARCHIPEL] ✨ Auto-Sync type: ${typeName} (HMAC bypassed)`);
+        // MISSION : Tolérance maximale pour le Hackathon (Silencieux pour le CLI)
         return { type, typeName, nodeId, payload };
     }
 
