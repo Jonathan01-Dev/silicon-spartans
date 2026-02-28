@@ -103,9 +103,10 @@
         const chatMessagesEl = document.getElementById('chatMessages'); const messageInput = document.getElementById('messageInput');
         const activePeerName = document.getElementById('activePeerName');
 
-        // --- WEB-RTC VIDEO (VERSION ROBUSTE) ---
+        // --- WEB-RTC VIDEO (VERSION ULTIME ROBUSTE) ---
         let localStream, peerConnection;
-        const iceConfig = { iceServers: [] }; // Uniquement local host candidates
+        const iceConfig = { iceServers: [] }; 
+        let processedSignals = new Set(); // Pour éviter de traiter les vieux signaux de l'historique
 
         async function startVideoCall() {
             if (!currentPeer) return alert("Sélectionnez un pair");
@@ -116,28 +117,30 @@
                 peerConnection = new RTCPeerConnection(iceConfig);
                 localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
                 peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-                peerConnection.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', candidate: e.candidate }); };
+                peerConnection.onicecandidate = e => { if (e.candidate) sendSignal(currentPeer, { type: 'candidate', candidate: e.candidate }); };
                 const offer = await peerConnection.createOffer();
                 await peerConnection.setLocalDescription(offer);
-                sendSignal({ type: 'offer', offer });
-            } catch (e) { alert("Accès caméra refusé ou contexte non-sécurisé."); endVideoCall(); }
+                sendSignal(currentPeer, { type: 'offer', offer });
+            } catch (e) { alert("Caméra bloquée."); endVideoCall(); }
         }
 
-        async function handleVideoSignal(signal) {
+        async function handleVideoSignal(fromNodeId, signal) {
             try {
                 if (signal.type === 'offer') {
-                    if (confirm("Appel vidéo de " + currentPeer.slice(0,8) + "... Accepter ?")) {
+                    if (confirm("Appel vidéo entrant de " + fromNodeId.slice(0,8) + "... Accepter ?")) {
+                        currentPeer = fromNodeId; // On cible l'appelant
+                        renderPeers();
                         document.getElementById('videoOverlay').style.display = 'flex';
                         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                         document.getElementById('localVideo').srcObject = localStream;
                         peerConnection = new RTCPeerConnection(iceConfig);
                         localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
                         peerConnection.ontrack = e => { document.getElementById('remoteVideo').srcObject = e.streams[0]; };
-                        peerConnection.onicecandidate = e => { if (e.candidate) sendSignal({ type: 'candidate', candidate: e.candidate }); };
+                        peerConnection.onicecandidate = e => { if (e.candidate) sendSignal(fromNodeId, { type: 'candidate', candidate: e.candidate }); };
                         await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.offer));
                         const answer = await peerConnection.createAnswer();
                         await peerConnection.setLocalDescription(answer);
-                        sendSignal({ type: 'answer', answer });
+                        sendSignal(fromNodeId, { type: 'answer', answer });
                     }
                 } else if (peerConnection) {
                     if (signal.type === 'answer') await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.answer));
@@ -146,7 +149,9 @@
             } catch (e) { console.error("WebRTC Error:", e); }
         }
 
-        async function sendSignal(signal) { await fetch('/api/video/signal', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ targetNodeId: currentPeer, signal }) }); }
+        async function sendSignal(to, signal) { 
+            await fetch('/api/video/signal', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ targetNodeId: to, signal }) }); 
+        }
         function endVideoCall() { if (localStream) localStream.getTracks().forEach(t => t.stop()); if (peerConnection) peerConnection.close(); peerConnection = null; document.getElementById('videoOverlay').style.display = 'none'; }
 
         // --- IA OFFLINE ---
@@ -206,14 +211,22 @@
             const res = await fetch('/api/messages'); const messages = await res.json();
             chatMessagesEl.innerHTML = messages.filter(m => m.from === currentPeer || m.to === currentPeer || m.to === 'TOUT LE MONDE').map(m => `
                 <div class="message ${m.from === 'MOI' ? 'sent' : 'received'}">
-                    ${formatMessage(m.message)}
+                    ${formatMessage(m.from, m.message, m.timestamp)}
                     <div style="font-size:9px; opacity:0.5; margin-top:6px; text-align:right">${new Date(m.timestamp).toLocaleTimeString()}</div>
                 </div>`).join('');
             chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
         }
 
-        function formatMessage(text) {
-            if (text.startsWith('[SIGNAL_VIDEO]')) { try { handleVideoSignal(JSON.parse(text.replace('[SIGNAL_VIDEO]', ''))); } catch(e){} return `<i>📹 Signal vidéo...</i>`; }
+        function formatMessage(from, text, ts) {
+            // Signal Vidéo : On ne le traite que s'il est RÉCENT (< 10s) et pas déjà traité
+            if (text.startsWith('[SIGNAL_VIDEO]')) { 
+                const sigId = from + ts;
+                if (!processedSignals.has(sigId) && (Date.now() - ts < 10000)) {
+                    processedSignals.add(sigId);
+                    try { handleVideoSignal(from, JSON.parse(text.replace('[SIGNAL_VIDEO]', ''))); } catch(e){}
+                }
+                return `<i>📹 Signal vidéo...</i>`; 
+            }
             if (text.includes('🖼️ Photo')) {
                 const fn = text.split(': ')[1]; const isS = text.includes('envoyée'); const url = isS ? `/shared/${fn}` : `/downloads/${fn}`;
                 return `<b>${isS?'🖼️ PHOTO ENVOYÉE':'🖼️ PHOTO REÇUE'}</b><br><img src="${url}" class="chat-image" onclick="window.open('${url}','_blank')">`;
