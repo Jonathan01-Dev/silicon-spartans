@@ -630,8 +630,27 @@
             // On ne rend que si c'est pour la conversation active
             if (msg.from === currentPeer || msg.to === currentPeer) {
                 renderMessage(msg);
+                
+                // MISSION : Auto-Téléchargement pour les vocaux (Fluidité type WhatsApp)
+                if (msg.from !== 'MOI' && msg.message.includes('🎤 Message vocal :')) {
+                    const fileName = msg.message.split(': ')[1];
+                    autoDownloadVoice(fileName);
+                }
             }
         });
+
+        async function autoDownloadVoice(fileName) {
+            console.log(`[P2P] ⚡ Auto-téléchargement du vocal: ${fileName}`);
+            const res = await fetch('/api/files');
+            const files = await res.json();
+            const file = files.find(f => f.file_name === fileName && f.location === 'remote');
+            
+            if (file) {
+                // On prépare la lecture automatique après le DL
+                window._playAfterDl = fileName;
+                await downloadFile(file.file_id, file.fromNodeId);
+            }
+        }
 
         socket.on('new_peer', () => { fetchPeers(); fetchFiles(); });
 
