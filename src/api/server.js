@@ -105,6 +105,21 @@ async function startArchipelEngine() {
         }
     });
 
+    // Mission : Signalisation WebRTC (Appel Vidéo P2P)
+    app.post('/api/video/signal', async (req, res) => {
+        const { targetNodeId, signal } = req.body;
+        if (!targetNodeId || !signal) return res.status(400).json({ error: "Cible ou signal manquant" });
+
+        try {
+            // On envoie le signal WebRTC via le protocole P2P ARCHIPEL existant
+            const payload = JSON.stringify({ type: 'VIDEO_SIGNAL', signal });
+            await messenger.send(targetNodeId, `[SIGNAL_VIDEO]${JSON.stringify(signal)}`);
+            res.json({ success: true });
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    });
+
     // Mission : Connexion manuelle (Roue de secours si Multicast bloqué)
     app.post('/api/connect', async (req, res) => {
         const { ip, port } = req.body;
