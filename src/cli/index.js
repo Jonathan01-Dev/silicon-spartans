@@ -94,27 +94,20 @@ async function main() {
 
     // Démarrage du serveur TCP
     const tcpServer = new TcpServer(identity, (msgInfo) => {
+        // MISSION CRITIQUE : Donner le message au Messenger pour l'historique
+        if (messenger) messenger.receive(msgInfo);
+
         const shortId = msgInfo.from.slice(0, 12);
         const lock = msgInfo.encrypted ? chalk.green('🔒') : chalk.red('🔓');
         console.log(`\n${lock} ${chalk.cyan(`[${shortId}…]`)} ${msgInfo.message}`);
-        messenger.receive(msgInfo);
+        process.stdout.write(chalk.gray('archipel> '));
+    }, async (peer) => {
+        console.log(`\n${chalk.green('🟢 Nouveau pair découvert !')} ${peer.ip}:${peer.tcpPort}`);
         process.stdout.write(chalk.gray('archipel> '));
     });
 
     const tcpPort = await tcpServer.start();
-
-    // Démarrage de la découverte UDP
-    const discovery = new PeerDiscovery(identity, tcpPort, async (peer) => {
-        console.log(`\n${chalk.green('🟢 Nouveau pair découvert !')} ${peer.ip}:${peer.tcpPort}`);
-
-        // Tentative automatique de connexion pour livrer d'éventuels messages en attente (Relais)
-        try {
-            await tcpServer.sendTo(peer.nodeId, Buffer.alloc(0)); // Poke TCP (ACK/Empty) pour déclencher _deliverRelayMessages
-        } catch (e) { /* ignore */ }
-
-        process.stdout.write(chalk.gray('archipel> '));
-    });
-
+    const discovery = new PeerDiscovery(identity, tcpPort);
     await discovery.start();
 
     // Initialisation du messenger
